@@ -2,6 +2,7 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import schedule from 'node-schedule';
 import { performance } from 'perf_hooks';
+import { MongoClient } from "mongodb";
 
 dotenv.config();
 
@@ -34,7 +35,7 @@ const syncRoster = async () => {
 	const vatusaHomeControllers = vatusaData.data.filter(c => c.membership === 'home').map(c => c.cid); // only membership: home
 	const vatusaVisitingControllers = vatusaData.data.filter(c => c.membership !== 'home').map(c => c.cid); // only membership: !home
 
-	const toBeAdded = vatusaControllers.filter(cid => !zabControllers.includes(cid));
+	const toBeAdded = vatusaControllers; //add to every user
 	const makeNonMember = zabMembers.filter(cid => !vatusaControllers.includes(cid));
 	const makeMember = zabNonMembers.filter(cid => vatusaControllers.includes(cid));
 	const makeVisitor = zabHomeControllers.filter(cid => vatusaVisitingControllers.includes(cid));
@@ -55,40 +56,30 @@ const syncRoster = async () => {
 	for (const cid of toBeAdded) {
 		const user = vatusaObject[cid];
 
-		const assignableRoles = user.roles.filter(role => availableRoles.includes(role.role.toLowerCase())).map(role => role.role.toLowerCase());
 
 		const userData = {
-			fname: user.fname,
-			lname: user.lname,
-			cid: user.cid,
-			rating: user.rating,
-			home: user.facility,
-			email: user.email,
-			broadcast: user.flag_broadcastOptedIn,
-			member: true,
-			vis: (user.membership === 'home') ? false : true,
-			roleCodes: (user.membership === 'home') ? assignableRoles : [],
 			createdAt: user.facility_join
 		}
 
-		await zabApi.post(`/controller/${user.cid}`, userData);
+
+// Replace the uri string with your MongoDB deployment's connection string.
+
+		const uri = process.env.MONGO_URI;
+
+		const client = new MongoClient(uri);
+		const database = client.db("test"); //db name! NOT THE CLUSTER NAME!
+		const users = database.collection("users");
+		const filter = { cid: cid };
+		const updateDate = {
+			$set: {
+				createdAt: user.facility_join
+			},
+		}
+		await users.updateOne(filter, updateDate)
+
 	}
 
-	for (const cid of makeMember) {
-		await zabApi.put(`/controller/${cid}/member`, {member: true});
-	}
 
-	for (const cid of makeNonMember) {
-		await zabApi.put(`/controller/${cid}/member`, {member: false});
-	}
-
-	for (const cid of makeVisitor) {
-		await zabApi.put(`/controller/${cid}/visit`, {vis: true});
-	}
-
-	for (const cid of makeHome) {
-		await zabApi.put(`/controller/${cid}/visit`, {vis: false});
-	}
 
 	console.log(`...Done!\nFinished in ${Math.round(performance.now() - start)/1000}s\n---`);
 }
