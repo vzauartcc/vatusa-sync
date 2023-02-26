@@ -32,13 +32,13 @@ projects:
         ZAB_API_URL: ''
 
       stg:
-        MONGO_URI: ''
+        MONGO_URI: '${api.stg.MONGO_URI}'
         VATUSA_API_KEY: '${api.stg.VATUSA_API_KEY}'
         ZAB_API_KEY: '${api.stg.MICRO_ACCESS_KEY}'
         ZAB_API_URL: ''
 
       prd:
-        MONGO_URI: ''
+        MONGO_URI: '${api.prd.MONGO_URI}'
         VATUSA_API_KEY: '${api.prd.VATUSA_API_KEY}'
         ZAB_API_KEY: '${api.prd.MICRO_ACCESS_KEY}'
         ZAB_API_URL: ''
