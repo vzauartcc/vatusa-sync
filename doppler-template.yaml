@@ -1,0 +1,44 @@
+# doppler-template.yaml
+projects:
+  - name: 'roster-sync' # Name may contain lowercase letters, spaces, numbers, hyphens, and underscores
+    description: 'Roster-Sync for vZAU Website'
+
+    # List of totally customizable environments, e.g Test, Stage, QA, CI-CD
+    environments:
+      - name: 'Development' # Name may contain letters, spaces, numbers, hyphens, and underscores
+        slug: 'dev' # Slug may contain letters, numbers, hyphens, and underscores
+        configs:
+          - slug: 'dev' # First slug *must* match environment slug name
+          - slug: 'dev_matt'
+          - slug: 'dev_noah'
+          - slug: 'dev_tim'
+
+      - name: 'Staging'
+        slug: 'stg'
+        configs:
+          - slug: 'stg'
+
+      - name: 'Production'
+        slug: 'prd'
+        configs:
+          - slug: 'prd'
+
+    # Define secrets for each environment
+    secrets:
+      dev:
+        MONGO_URI: ''
+        VATUSA_API_KEY: '${api.dev.VATUSA_API_KEY}'
+        ZAB_API_KEY: '${api.dev.MICRO_ACCESS_KEY}'
+        ZAB_API_URL: ''
+
+      stg:
+        MONGO_URI: '${api.stg.MONGO_URI}'
+        VATUSA_API_KEY: '${api.stg.VATUSA_API_KEY}'
+        ZAB_API_KEY: '${api.stg.MICRO_ACCESS_KEY}'
+        ZAB_API_URL: ''
+
+      prd:
+        MONGO_URI: '${api.prd.MONGO_URI}'
+        VATUSA_API_KEY: '${api.prd.VATUSA_API_KEY}'
+        ZAB_API_KEY: '${api.prd.MICRO_ACCESS_KEY}'
+        ZAB_API_URL: ''
