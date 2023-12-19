@@ -16,36 +16,41 @@ const syncRoster = async () => {
 
 	const start = performance.now();
 
+	const sixMonthsAgo = new Date();
+	sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 182);
+
 	console.log(`Syncing Roster...`);
 
 	const { data: vatusaData } = await axios.get(`https://api.vatusa.net/v2/facility/ZAU/roster/both?apikey=${process.env.VATUSA_API_KEY}`).catch(console.error);
-	const { data: zabData } = await axios.get(`${process.env.ZAB_API_URL}/controller`);
-	const allZabControllers = [...zabData.data.home, ...zabData.data.visiting];
-	const { data: zabRoles } = await axios.get(`${process.env.ZAB_API_URL}/controller/role`);
-	const availableRoles = zabRoles.data.map(role => role.code);
+	const { data: zauData } = await axios.get(`${process.env.ZAB_API_URL}/controller`);
+	const allZauControllers = [...zauData.data.home, ...zauData.data.visiting];
+	const nonZauControllers = zauData.data.removed;
+	const { data: zauRoles } = await axios.get(`${process.env.ZAB_API_URL}/controller/role`);
+	const availableRoles = zauRoles.data.map(role => role.code);
 
-	const zabControllers = allZabControllers.map(c => c.cid); // everyone in db
-	const zabMembers = allZabControllers.filter(c => c.member).map(c => c.cid); // only member: true
-	const zabNonMembers = allZabControllers.filter(c => !c.member).map(c => c.cid); // only member: false
-	const zabHomeControllers = zabData.data.home.map(c => c.cid); // only vis: false
-	const zabVisitingControllers = zabData.data.visiting.map(c => c.cid); // only: vis: true
+	const zauControllers = allZauControllers.map(c => c.cid); // everyone in db
+	const zauMembers = allZauControllers.filter(c => c.member).map(c => c.cid); // only member: true
+	const zauNonMembers = allZauControllers.filter(c => !c.member).map(c => c.cid); // only member: false
+	const zauHomeControllers = zauData.data.home.map(c => c.cid); // only vis: false
+	const zauVisitingControllers = zauData.data.visiting.map(c => c.cid); // only: vis: true
+	const zauCertRemoval = nonZauControllers.filter(c => c.removalDate && new Date(c.removalDate) < sixMonthsAgo && (c.certCodes && c.certCodes.length > 0)).map(c => c.cid);
 
 	const vatusaControllers = vatusaData.data.map(c => c.cid); // all controllers returned by VATUSA
 	const vatusaHomeControllers = vatusaData.data.filter(c => c.membership === 'home').map(c => c.cid); // only membership: home
 	const vatusaVisitingControllers = vatusaData.data.filter(c => c.membership !== 'home').map(c => c.cid); // only membership: !home
 
-	const toBeAdded = vatusaControllers.filter(cid => !zabControllers.includes(cid));
-	const toBeChecked = zabControllers;
-	const makeNonMember = zabMembers.filter(cid => !vatusaControllers.includes(cid));
-	const makeMember = zabNonMembers.filter(cid => vatusaControllers.includes(cid));
-	const makeVisitor = zabHomeControllers.filter(cid => vatusaVisitingControllers.includes(cid));
-	const makeHome = zabVisitingControllers.filter(cid => vatusaHomeControllers.includes(cid));
+	const toBeAdded = vatusaControllers.filter(cid => !zauControllers.includes(cid));
+	const makeNonMember = zauMembers.filter(cid => !vatusaControllers.includes(cid));
+	const makeMember = zauNonMembers.filter(cid => vatusaControllers.includes(cid));
+	const makeVisitor = zauHomeControllers.filter(cid => vatusaVisitingControllers.includes(cid));
+	const makeHome = zauVisitingControllers.filter(cid => vatusaHomeControllers.includes(cid));
 
 	console.log(`Members to be added: ${toBeAdded.join(', ')}`);
 	console.log(`Members to be removed: ${makeNonMember.join(', ')}`);
 	console.log(`Controllers to be made member: ${makeMember.join(', ')}`);
 	console.log(`Controllers to be made visitor: ${makeVisitor.join(', ')}`);
 	console.log(`Controllers to be made home controller: ${makeHome.join(', ')}`);
+	console.log(`Certs removed after 6 months of being removed: ${zauCertRemoval.join(', ')}`);
 
 	const vatusaObject = {};
 
@@ -94,6 +99,10 @@ const syncRoster = async () => {
 	for (const cid of makeHome) {
 		await zabApi.put(`/controller/${cid}/visit`, {vis: false});
 	}
+
+	for (const cid of zauCertRemoval) {
+		await zabApi.put(`/controller/remove-cert/${cid}`, { certCodes: {} })
+	  }
 
 	console.log(`...Done!\nFinished in ${Math.round(performance.now() - start)/1000}s\n---`);
 }
