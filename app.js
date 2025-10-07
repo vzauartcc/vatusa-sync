@@ -63,6 +63,8 @@ const syncRoster = async () => {
 
 		const assignableRoles = user.roles.filter(role => availableRoles.includes(role.role.toLowerCase())).map(role => role.role.toLowerCase());
 
+		const isVisitor = (user.membership === 'home') ? false : true
+
 		const userData = {
 			fname: user.fname,
 			lname: user.lname,
@@ -72,9 +74,10 @@ const syncRoster = async () => {
 			email: user.email,
 			broadcast: user.flag_broadcastOptedIn,
 			member: true,
-			vis: (user.membership === 'home') ? false : true,
-			roleCodes: (user.membership === 'home') ? assignableRoles : [],
-			createdAt: user.facility_join
+			vis: isVisitor,
+			roleCodes: !isVisitor ? assignableRoles : [],
+			createdAt: new Date(),
+			joinDate: user.facility_join
 		}
 
 		await zabApi.post(`/controller/${user.cid}`, userData);
@@ -106,6 +109,7 @@ const syncRoster = async () => {
 
 	console.log(`...Done!\nFinished in ${Math.round(performance.now() - start)/1000}s\n---`);
 }
+
 
 (() => {
 	syncRoster();
