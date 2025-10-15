@@ -1,2 +1,43 @@
+# Dependencies
 node_modules
+
+# Logs
 npm-debug.log
+.npm
+
+# Configuration/Environment
+.env
+.local
+*.log
+
+# Build artifacts (will be created during the build stage)
+dist
+build
+temp
+
+# Git files
+.git
+.gitignore
+.github
+.gitattributes
+
+# Docker build files
+Dockerfile
+docker-compose.yml
+
+# Mac OS X
+.DS_Store
+
+# IDEs
+.vscode
+.idea
+
+#Linting
+.eslintignore
+.eslintrc.json
+eslint.config.mjs
+.prettierrc.json
+# Project Files
+README.md
+doppler-template.yaml
+*.tsbuildinfo
