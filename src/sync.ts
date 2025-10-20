@@ -11,6 +11,7 @@ const zauApi = (uri: string, options: RequestInit = {}) => {
 		...options,
 		headers: {
 			Authorization: `Bearer ${process.env['ZAU_API_KEY']}`,
+			'Content-Type': 'application/json',
 		},
 	});
 };
