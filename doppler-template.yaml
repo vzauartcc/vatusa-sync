@@ -26,19 +26,16 @@ projects:
     # Define secrets for each environment
     secrets:
       dev:
-        MONGO_URI: ''
         VATUSA_API_KEY: '${api.dev.VATUSA_API_KEY}'
-        ZAB_API_KEY: '${api.dev.MICRO_ACCESS_KEY}'
-        ZAB_API_URL: ''
+        ZAU_API_KEY: '${api.dev.MICRO_ACCESS_KEY}'
+        ZAU_API_URL: ''
 
       stg:
-        MONGO_URI: '${api.stg.MONGO_URI}'
         VATUSA_API_KEY: '${api.stg.VATUSA_API_KEY}'
-        ZAB_API_KEY: '${api.stg.MICRO_ACCESS_KEY}'
-        ZAB_API_URL: ''
+        ZAU_API_KEY: '${api.stg.MICRO_ACCESS_KEY}'
+        ZAU_API_URL: ''
 
       prd:
-        MONGO_URI: '${api.prd.MONGO_URI}'
         VATUSA_API_KEY: '${api.prd.VATUSA_API_KEY}'
-        ZAB_API_KEY: '${api.prd.MICRO_ACCESS_KEY}'
-        ZAB_API_URL: ''
+        ZAU_API_KEY: '${api.prd.MICRO_ACCESS_KEY}'
+        ZAU_API_URL: ''
