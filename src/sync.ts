@@ -1,8 +1,5 @@
-import type {
-	IRoleResponse,
-	IVatusaControllerResponse,
-	IZauControllerResponse,
-} from './types/apiResponses.js';
+import type { IVatusaControllerResponse, IZauControllerResponse } from './types/apiResponses.js';
+import type { IZauRole } from './types/zauController.js';
 
 const zauApi = (uri: string, options: RequestInit = {}) => {
 	if (!uri.startsWith('/')) uri = '/' + uri;
@@ -25,25 +22,29 @@ export async function vatusaSync() {
 		sixMonthsAgo.setDate(new Date().getDate() - 182);
 
 		const usaMark = performance.now();
-		const { data: vatusaData }: IVatusaControllerResponse = (await fetch(
-			`https://api.vatusa.net/v2/facility/ZAU/roster/both?apikey=${process.env['VATUSA_API_KEY']}`,
-			{
-				method: 'GET',
-			},
-		).then((response) => response.json())) as IVatusaControllerResponse;
+		const { data: vatusaData }: IVatusaControllerResponse = (await (
+			await fetch(
+				`https://api.vatusa.net/v2/facility/ZAU/roster/both?apikey=${process.env['VATUSA_API_KEY']}`,
+				{
+					method: 'GET',
+				},
+			)
+		).json()) as IVatusaControllerResponse;
 
 		console.log(`VATUSA API took ${(performance.now() - usaMark).toFixed(2)}ms`);
 
 		const zauCMark = performance.now();
-		const { data: zauData }: IZauControllerResponse = (await zauApi('/controller', {
-			method: 'GET',
-		}).then((response) => response.json())) as IZauControllerResponse;
+		const zauData: IZauControllerResponse = (await (
+			await zauApi('/user', { method: 'GET' })
+		).json()) as IZauControllerResponse;
 		console.log(`ZAU Controller API took ${(performance.now() - zauCMark).toFixed(2)}ms`);
 
 		const zauRMark = performance.now();
-		const { data: zauRoles }: IRoleResponse = (await zauApi(`/controller/role`, {
-			method: 'GET',
-		}).then((response) => response.json())) as IRoleResponse;
+		const zauRoles: IZauRole[] = (await (
+			await zauApi(`/controller/role`, {
+				method: 'GET',
+			})
+		).json()) as IZauRole[];
 		console.log(`ZAU Role API took ${(performance.now() - zauRMark).toFixed(2)}ms`);
 
 		console.log(`API calls took ${(performance.now() - start).toFixed(2)}ms to complete.`);
