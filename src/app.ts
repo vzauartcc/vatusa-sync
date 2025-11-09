@@ -7,7 +7,6 @@ if (!process.env['ZAU_API_URL'] || !process.env['ZAU_API_KEY'] || !process.env['
 	);
 	process.exit(4);
 }
-const task = new Cron('*/10 * * * *', () => vatusaSync());
+const task = new Cron('*/10 * * * *', () => vatusaSync(), { catch: true });
 
-console.log(`Performing startup run. Next scheduled run is at: ${task.nextRun()}`);
-vatusaSync();
+console.log(`Task scheduled, next run is at: ${task.nextRun()}`);
