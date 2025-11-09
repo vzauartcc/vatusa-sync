@@ -18,26 +18,41 @@ export async function vatusaSync() {
 		console.log(`\n\n⏳ Starting sync . . .`);
 		const start = performance.now();
 
-		const sixMonthsAgo = new Date();
-		sixMonthsAgo.setDate(new Date().getDate() - 182);
+		const today = new Date();
+		const sixMonthsAgo = new Date(
+			today.getUTCFullYear(),
+			today.getUTCMonth(),
+			today.getUTCDate() - 182,
+		);
 
 		const usaMark = performance.now();
-		const { data: vatusaData }: IVatusaControllerResponse = (await (
-			await fetch(
-				`https://api.vatusa.net/v2/facility/ZAU/roster/both?apikey=${process.env['VATUSA_API_KEY']}`,
-				{
-					method: 'GET',
-				},
-			)
-		).json()) as IVatusaControllerResponse;
+		const vatusaResponse = await fetch(
+			`https://api.vatusa.net/v2/facility/ZAU/roster/both?apikey=${process.env['VATUSA_API_KEY']}`,
+			{
+				method: 'GET',
+			},
+		);
+		if (!vatusaResponse.ok) {
+			console.error(
+				'Failed to fetch VATUSA data',
+				vatusaResponse.status,
+				vatusaResponse.statusText,
+			);
+			return;
+		}
 
-		console.log(`VATUSA API took ${(performance.now() - usaMark).toFixed(2)}ms`);
+		const { data: vatusaData }: IVatusaControllerResponse =
+			(await vatusaResponse.json()) as IVatusaControllerResponse;
+
+		console.debug(`VATUSA API took ${(performance.now() - usaMark).toFixed(2)}ms`);
 
 		const zauCMark = performance.now();
-		const zauData: IZauControllerResponse = (await (
-			await zauApi('/user', { method: 'GET' })
-		).json()) as IZauControllerResponse;
-		console.log(`ZAU Controller API took ${(performance.now() - zauCMark).toFixed(2)}ms`);
+		const zauResponse = await zauApi('/user', { method: 'GET' });
+		if (!zauResponse.ok) {
+			console.error('Failed to fetch ZAU data', zauResponse.status, zauResponse.statusText);
+		}
+		const zauData = (await zauResponse.json()) as IZauControllerResponse;
+		console.debug(`ZAU Controller API took ${(performance.now() - zauCMark).toFixed(2)}ms`);
 
 		const zauRMark = performance.now();
 		const zauRoles: IZauRole[] = (await (
@@ -45,9 +60,9 @@ export async function vatusaSync() {
 				method: 'GET',
 			})
 		).json()) as IZauRole[];
-		console.log(`ZAU Role API took ${(performance.now() - zauRMark).toFixed(2)}ms`);
+		console.debug(`ZAU Role API took ${(performance.now() - zauRMark).toFixed(2)}ms`);
 
-		console.log(`API calls took ${(performance.now() - start).toFixed(2)}ms to complete.`);
+		console.debug(`API calls took ${(performance.now() - start).toFixed(2)}ms to complete.`);
 
 		const availableRoles = zauRoles.map((role) => role.code);
 
@@ -81,6 +96,7 @@ export async function vatusaSync() {
 			const zUser = allZauControllers.find((z) => z.cid === vUser.cid);
 
 			const isVisitor = vUser.membership !== 'home';
+
 			// Add user to database
 			if (!zUser) {
 				const assignableRoles = vUser.roles
@@ -104,11 +120,13 @@ export async function vatusaSync() {
 						joinDate: vUser.facility_join,
 						prefName: vUser.flag_nameprivacy,
 					}),
-				}).catch((err) => {
-					console.log(`Error creating new user for ${vUser.cid}: ${err}`);
-				});
-
-				added++;
+				})
+					.then(() => {
+						added++;
+					})
+					.catch((err) => {
+						console.log(`Error creating new user for ${vUser.cid}: ${err}`);
+					});
 			} else {
 				// Update user if core info changed
 				if (
@@ -127,8 +145,11 @@ export async function vatusaSync() {
 							broadcast: vUser.flag_broadcastOptedIn,
 							prefName: vUser.flag_nameprivacy,
 						}),
-					}).catch((err) => console.log(`Error update ${zUser.cid}'s core details: ${err}`));
-					updatedCore++;
+					})
+						.then(() => {
+							updatedCore++;
+						})
+						.catch((err) => console.log(`Error update ${zUser.cid}'s core details: ${err}`));
 				}
 
 				// Update membership if necessary
@@ -136,11 +157,13 @@ export async function vatusaSync() {
 					await zauApi(`/controller/${zUser.cid}/member`, {
 						method: 'PUT',
 						body: JSON.stringify({ member: true, joinDate: vUser.facility_join }),
-					}).catch((err) => {
-						console.log(`Error making ${zUser.cid} a member: ${err}`);
-					});
-
-					madeMember++;
+					})
+						.then(() => {
+							madeMember++;
+						})
+						.catch((err) => {
+							console.log(`Error making ${zUser.cid} a member: ${err}`);
+						});
 				}
 
 				// Update visiting status if necessary
@@ -148,11 +171,13 @@ export async function vatusaSync() {
 					await zauApi(`/controller/${zUser.cid}/visit`, {
 						method: 'PUT',
 						body: JSON.stringify({ vis: isVisitor }),
-					}).catch((err) => {
-						console.log(`Error making ${zUser.cid} a visitor: ${err}`);
-					});
-
-					madeVisitor++;
+					})
+						.then(() => {
+							madeVisitor++;
+						})
+						.catch((err) => {
+							console.log(`Error making ${zUser.cid} a visitor: ${err}`);
+						});
 				}
 
 				// Update rating if necessary
@@ -160,36 +185,42 @@ export async function vatusaSync() {
 					await zauApi(`/controller/${zUser.cid}/rating`, {
 						method: 'PUT',
 						body: JSON.stringify({ rating: vUser.rating }),
-					}).catch((err) => {
-						console.log(`Error updating rating for ${vUser.cid}: ${err}`);
-					});
-
-					updatedRating++;
+					})
+						.then(() => {
+							updatedRating++;
+						})
+						.catch((err) => {
+							console.log(`Error updating rating for ${vUser.cid}: ${err}`);
+						});
 				}
 			}
 		}
 
-		// Convert member users into non-members from VATUSA data
+		// Convert member users into non-member users from VATUSA data
 		for (const cid of makeNonMember) {
 			await zauApi(`/controller/${cid}/member`, {
 				method: 'PUT',
 				body: JSON.stringify({ member: false }),
-			}).catch((err) => {
-				console.log('Error removing', cid, 'as a member:', err);
-			});
-
-			removedMember++;
+			})
+				.then(() => {
+					removedMember++;
+				})
+				.catch((err) => {
+					console.log('Error removing', cid, 'as a member:', err);
+				});
 		}
 
 		for (const cid of zauCertRemovalCids) {
 			await zauApi(`/controller/remove-cert/${cid}`, {
 				method: 'PUT',
 				body: JSON.stringify({}),
-			}).catch((err) => {
-				console.log('Error removing cert for', cid, ':', err);
-			});
-
-			certsRemoved++;
+			})
+				.then(() => {
+					certsRemoved++;
+				})
+				.catch((err) => {
+					console.log('Error removing cert for', cid, ':', err);
+				});
 		}
 
 		console.log(`Added ${added} new users.`);
