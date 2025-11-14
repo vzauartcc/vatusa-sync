@@ -10,3 +10,12 @@ if (!process.env['ZAU_API_URL'] || !process.env['ZAU_API_KEY'] || !process.env['
 const task = new Cron('*/10 * * * *', () => vatusaSync(), { catch: true });
 
 console.log(`Task scheduled, next run is at: ${task.nextRun()}`);
+
+process.on('uncaughtException', (err, _origin) => {
+	console.log('\n\n\n');
+	console.log('==========================');
+	console.log('    UNCAUGHT EXCEPTION    ');
+	console.log('==========================');
+	console.error(err);
+	console.log('\n\n');
+});
