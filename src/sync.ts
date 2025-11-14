@@ -155,7 +155,7 @@ export async function vatusaSync() {
 				// Update membership if necessary
 				if (!zUser.member) {
 					await zauApi(`/controller/${zUser.cid}/member`, {
-						method: 'PUT',
+						method: 'PATCH',
 						body: JSON.stringify({ member: true, joinDate: vUser.facility_join }),
 					})
 						.then(() => {
@@ -169,7 +169,7 @@ export async function vatusaSync() {
 				// Update visiting status if necessary
 				if (zUser.vis !== isVisitor) {
 					await zauApi(`/controller/${zUser.cid}/visit`, {
-						method: 'PUT',
+						method: 'PATCH',
 						body: JSON.stringify({ vis: isVisitor }),
 					})
 						.then(() => {
@@ -183,7 +183,7 @@ export async function vatusaSync() {
 				// Update rating if necessary
 				if (zUser.rating !== vUser.rating) {
 					await zauApi(`/controller/${zUser.cid}/rating`, {
-						method: 'PUT',
+						method: 'PATCH',
 						body: JSON.stringify({ rating: vUser.rating }),
 					})
 						.then(() => {
@@ -199,7 +199,7 @@ export async function vatusaSync() {
 		// Convert member users into non-member users from VATUSA data
 		for (const cid of makeNonMember) {
 			await zauApi(`/controller/${cid}/member`, {
-				method: 'PUT',
+				method: 'PATCH',
 				body: JSON.stringify({ member: false }),
 			})
 				.then(() => {
@@ -211,8 +211,8 @@ export async function vatusaSync() {
 		}
 
 		for (const cid of zauCertRemovalCids) {
-			await zauApi(`/controller/remove-cert/${cid}`, {
-				method: 'PUT',
+			await zauApi(`/controller/${cid}/remove-cert`, {
+				method: 'PATCH',
 				body: JSON.stringify({}),
 			})
 				.then(() => {
