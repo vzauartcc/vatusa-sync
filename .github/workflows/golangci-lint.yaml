@@ -3,20 +3,23 @@
 
 name: golangci-lint
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - development
+
   push:
     branches:
-      - main
-      - master
-  pull_request:
+      - development
 
 permissions:
   contents: read
   pull-requests: read
 
 jobs:
-  golangci:
-    name: lint
+  golangci-lint:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout main
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
