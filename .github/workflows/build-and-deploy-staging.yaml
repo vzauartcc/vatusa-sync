@@ -8,7 +8,6 @@ on:
 
 jobs:
   Build-and-Push:
-    needs: Go-Format-Check
     runs-on: ubuntu-latest
 
     steps:
