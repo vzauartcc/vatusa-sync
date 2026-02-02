@@ -1,0 +1,73 @@
+# Modified from https://raw.githubusercontent.com/go-openapi/errors/refs/heads/master/.golangci.yml
+
+version: "2"
+linters:
+  default: all
+  disable:
+    - contextcheck
+    - cyclop
+    - depguard
+    - errchkjson
+    #    - errorlint
+    - exhaustive
+    - exhaustruct
+    - forcetypeassert
+    - funlen
+    - gochecknoglobals
+    #    - gochecknoinits
+    - gocognit # check once in a while
+    #    - godot
+    - godox
+    - gosmopolitan
+    - inamedparam
+    - ireturn
+    - lll
+    - mnd
+    - musttag
+    #    - nestif
+    - nlreturn
+    #    - nonamedreturns
+    - paralleltest
+    - tagliatelle
+    - testpackage
+    - thelper
+    #    - tparallel
+    - unparam
+    #    - varnamelen
+    #    - whitespace
+    - wrapcheck
+    - wsl
+  settings:
+    dupl:
+      threshold: 200
+    goconst:
+      min-len: 2
+      min-occurrences: 3
+    gocyclo:
+      min-complexity: 45
+    varnamelen:
+      ignore-names:
+        - err
+        - id
+        - i
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -1,23 +1,17 @@
-# 1. Build Typescript
-FROM node:24-slim AS builder
+FROM golang:1.25.5-alpine AS builder
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-COPY package*.json ./
+COPY go.mod go.sum ./
 
-RUN npm ci
+RUN go mod download
 
-COPY . .
+COPY . ./
 
-RUN npm run build
+RUN CGO_ENABLE=0 GOOS=linux go build -v -o roster-sync ./cmd/roster-sync/main.go
 
-# 2. Copy built files to new bare image
-FROM gcr.io/distroless/nodejs24-debian12 AS production
-ENV NODE_ENV=production
+FROM gcr.io/distroless/static-debian13
 
-WORKDIR /usr/src/app
+COPY --from=builder /app/roster-sync /
 
-COPY --from=builder /usr/src/app/dist ./dist
-COPY --from=builder /usr/src/app/node_modules ./node_modules
-
-CMD ["dist/app.js"]
+ENTRYPOINT ["./roster-sync"]
