@@ -8,7 +8,7 @@ RUN go mod download
 
 COPY . ./
 
-RUN CGO_ENABLE=0 GOOS=linux go build -v -o roster-sync ./
+RUN CGO_ENABLE=0 GOOS=linux go build -v -o roster-sync ./cmd/roster-sync/main.go
 
 FROM gcr.io/distroless/static-debian13
 
