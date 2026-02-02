@@ -81,7 +81,7 @@ func FetchData(ctx context.Context) Roster {
 func FetchRoles(ctx context.Context) []string {
 	req, err := NewZauAuthRequest(ctx, http.MethodGet, "/controller/role", nil)
 	if err != nil {
-		log.Printf("Error creating ZAU Role request: %v", err)
+		log.Printf("Error creating ZAU Role request: %v\n", err)
 		return []string{}
 	}
 
