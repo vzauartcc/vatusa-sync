@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - "development"
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
   workflow_dispatch:
 
 jobs:

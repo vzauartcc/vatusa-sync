@@ -6,6 +6,10 @@ name: Prettier Check
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
 
 jobs:
   gofmt_check:
