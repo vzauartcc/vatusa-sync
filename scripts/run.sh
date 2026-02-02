@@ -7,4 +7,6 @@ if ! command -v doppler &> /dev/null; then
     exit 1
 fi
 
+export LOCAL_DEV_ENVIRONMENT="true"
+
 doppler run -p roster-sync -c stg -- go run ./cmd/roster-sync/main.go "$@"

@@ -34,7 +34,10 @@ func main() {
 
 	runner.Start()
 
-	go doRosterSync(ctx)
+	if os.Getenv("LOCAL_DEV_ENVIRONMENT") != "" {
+		log.Println("Invoked from script, running initial sync")
+		go doRosterSync(ctx)
+	}
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
@@ -59,7 +62,7 @@ func setupScheduler(ctx context.Context, runner *cron.Cron, job func(context.Con
 }
 
 func doRosterSync(ctx context.Context) {
-	log.Println("\n⏳ Starting sync . . .")
+	log.Println("⏳ Starting sync . . .")
 
 	start := time.Now()
 
@@ -67,8 +70,6 @@ func doRosterSync(ctx context.Context) {
 	if failed {
 		return
 	}
-
-	log.Printf("Got %d controllers from ZAU\n", len(zauControllers.Home)+len(zauControllers.Visiting))
 
 	allZauControllers, zauCertRemovalCIDs, makeNonMember := generateRosterSyncSlices(zauControllers, vatusaControllers)
 
@@ -176,6 +177,8 @@ func getControllers(ctx context.Context) (zau.Roster, []vatusa.Controller, bool)
 
 		return zau.Roster{}, nil, true
 	}
+
+	log.Printf("Got %d controllers from ZAU\n", len(zauControllers.Home)+len(zauControllers.Visiting))
 
 	return zauControllers, vatusaControllers, false
 }
