@@ -67,15 +67,9 @@ func FetchData(ctx context.Context) Roster {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error reading ZAU Controller data: %v\n", err)
-		return Roster{}
-	}
-
 	var zauData Roster
 
-	err = json.Unmarshal(body, &zauData)
+	err = json.NewDecoder(resp.Body).Decode(&zauData)
 	if err != nil {
 		log.Printf("Error unmarshaling ZAU Controller data: %v\n", err)
 		return Roster{}
@@ -98,15 +92,9 @@ func FetchRoles(ctx context.Context) []string {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error reading ZAU Role data: %v\n", err)
-		return []string{}
-	}
-
 	var zauData []Role
 
-	err = json.Unmarshal(body, &zauData)
+	err = json.NewDecoder(resp.Body).Decode(&zauData)
 	if err != nil {
 		log.Printf("Error unmarshaling ZAU Role data: %v\n", err)
 		return []string{}

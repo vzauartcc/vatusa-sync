@@ -1,11 +1,11 @@
 package vatusa
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -37,15 +37,9 @@ func FetchData(ctx context.Context) ([]Controller, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error reading VATUSA data: %v\n", err)
-		return []Controller{}, err
-	}
-
 	var vatusaData Roster
 
-	err = json.Unmarshal(body, &vatusaData)
+	err = json.NewDecoder(resp.Body).Decode(&vatusaData)
 	if err != nil {
 		log.Printf("Error unmarshaling VATUSA data: %v\n", err)
 		return []Controller{}, err
@@ -54,23 +48,20 @@ func FetchData(ctx context.Context) ([]Controller, error) {
 	return vatusaData.Data, nil
 }
 
-func (ct *CertSyncDate) UnmarshalJSON(b []byte) error {
+func (ct *CertSyncDate) UnmarshalJSON(byteSlice []byte) error {
 	// The JSON data byte array is a quoted string, e.g., "2025-12-08 03:23:09"
 	// We unmarshal it into a regular string variable.
-	var stringTime string
-
-	err := json.Unmarshal(b, &stringTime)
-	if err != nil {
-		return err
+	if string(byteSlice) == "null" {
+		return nil
 	}
 
-	// Now parse the string 's' using the known layout
+	stringTime := string(bytes.Trim(byteSlice, "\""))
+
 	timeTime, err := time.Parse("2006-01-02 15:04:05", stringTime)
 	if err != nil {
 		return err
 	}
 
-	// Set the value of the CustomTime pointer
 	*ct = CertSyncDate(timeTime)
 
 	return nil
