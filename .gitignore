@@ -1,24 +1,46 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Compiled binaries, including the one created by 'go build'
+# If your main package is in the root, it creates a binary named after the directory
+# or the name you specified (like 'app' in your Dockerfile).
+# It's safest to ignore binaries where they are usually created.
+/app
+/roster-sync
+/*.exe
+/*.dll
+/*.so
+/bin/
 
-node_modules
-dist
-*.local
-*.tsbuildinfo
+# Test files
+# Ignores test coverage reports and test binaries
+*.test
+*.out
+*coverage*.html
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# Dependency files and module cache
+# Ignores the Go module cache directories
+/pkg/
+/vendor/
+/.cache/
+
+# Cross-compilation build files
+# These are temporary files generated when compiling for different architectures
+/dist/
+
+# --- Standard OS and IDE Files ---
+
+# Mac OS specific
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+
+# Windows specific
+Thumbs.db
+
+# Linux specific
+*~
+# Vim/Nano swap files
+.*.swp
+.nfs*
+
+# VS Code
+.vscode/
+
+# IntelliJ / GoLand
+.idea/

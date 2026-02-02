@@ -1,43 +1,44 @@
-# Dependencies
-node_modules
+# --- Standard Version Control and IDE Files ---
 
-# Logs
-npm-debug.log
-.npm
-
-# Configuration/Environment
-.env
-.local
-*.log
-
-# Build artifacts (will be created during the build stage)
-dist
-build
-temp
-
-# Git files
 .git
 .gitignore
-.github
-.gitattributes
+.svn
+.hg
+.idea
+.vscode
+Thumbs.db
 
-# Docker build files
+# --- Go Specific Files/Directories to Ignore ---
+
+# Go module cache: Not needed inside the builder, as 'go mod download' handles it.
+
+vendor/
+
+# Binary output: We control the build output name ('app' or '/go-app').
+
+# Ignore any other default local binary names.
+
+_.exe
+_.test
+\*.prof
+
+# --- Local Environment and Cache ---
+
+# Local cache directories from your host machine
+
+.cache/
+tmp/
+temp/
+
+# Log files and temporary files
+
+_.log
+_~
+
+# --- Docker Files Themselves ---
+
+# These are only needed by the Docker daemon, not inside the image
+
 Dockerfile
 docker-compose.yml
-
-# Mac OS X
-.DS_Store
-
-# IDEs
-.vscode
-.idea
-
-#Linting
-.eslintignore
-.eslintrc.json
-eslint.config.mjs
-.prettierrc.json
-# Project Files
-README.md
-doppler-template.yaml
-*.tsbuildinfo
+.dockerignore
