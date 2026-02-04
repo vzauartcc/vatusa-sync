@@ -22,6 +22,8 @@ func main() {
 		panic("Missing at least one environment variable. Check to make sure the following are set: 'VATUSA_API_KEY', 'ZAU_API_KEY', 'ZAU_API_URL'.")
 	}
 
+	log.Println("roster-sync starting. . . .")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -36,7 +38,10 @@ func main() {
 
 	if os.Getenv("LOCAL_DEV_ENVIRONMENT") != "" {
 		log.Println("Invoked from script, running initial sync")
+
 		go doRosterSync(ctx)
+	} else {
+		log.Println("Sleeping until next run. . . .")
 	}
 
 	sigs := make(chan os.Signal, 1)
@@ -44,7 +49,7 @@ func main() {
 
 	<-sigs
 
-	log.Println("Shutting down. . . .")
+	log.Println("roster-sync shutting down. . . .")
 
 	stopCtx := runner.Stop()
 
@@ -62,10 +67,6 @@ func setupScheduler(ctx context.Context, runner *cron.Cron, job func(context.Con
 }
 
 func doRosterSync(ctx context.Context) {
-	log.Println("⏳ Starting sync . . .")
-
-	start := time.Now()
-
 	zauControllers, vatusaControllers, failed := getControllers(ctx)
 	if failed {
 		return
@@ -129,8 +130,6 @@ func doRosterSync(ctx context.Context) {
 
 	certsRemoved := removeCerts(ctx, zauCertRemovalCIDs)
 
-	log.Printf("⌛ Done! Finished in %.1f seconds\n", time.Since(start).Seconds())
-
 	if added > 0 {
 		log.Printf("Added %d new users.\n", added)
 	}
@@ -156,7 +155,7 @@ func doRosterSync(ctx context.Context) {
 	}
 
 	if certsRemoved > 0 {
-		log.Printf("Removed %d expired certs for non-member users.\n\n", certsRemoved)
+		log.Printf("Removed %d expired certs for non-member users.\n\n\n", certsRemoved)
 	}
 }
 
