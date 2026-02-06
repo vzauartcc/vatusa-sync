@@ -168,16 +168,12 @@ func getControllers(ctx context.Context) (zau.Roster, []vatusa.Controller, bool)
 		return zau.Roster{}, nil, true
 	}
 
-	log.Printf("Got %d controllers from VATUSA\n", len(vatusaControllers))
-
 	zauControllers := zau.FetchData(ctx)
 	if len(zauControllers.Home) == 0 {
 		log.Printf("Failed to fetch ZAU controllers: %v\n", err)
 
 		return zau.Roster{}, nil, true
 	}
-
-	log.Printf("Got %d controllers from ZAU\n", len(zauControllers.Home)+len(zauControllers.Visiting))
 
 	return zauControllers, vatusaControllers, false
 }
