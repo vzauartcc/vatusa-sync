@@ -31,6 +31,5 @@ jobs:
           push: true
           tags: |
             ghcr.io/vzauartcc/roster-sync:${{ github.sha }}
-            ghcr.io/vzauartcc/roster-sync:buildcache
-          cache-from: type=registry,ref=ghcr.io/vzauartcc/roster-sync:buildcache
-          cache-to: type=registry,ref=ghcr.io/vzauartcc/roster-sync:buildcache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

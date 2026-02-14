@@ -3,14 +3,18 @@ name: Build and Deploy
 on:
   push:
     branches:
-      - 'main'
+      - "main"
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
 
 jobs:
   Build-and-Push:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout master
+      - name: Checkout main
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
       - name: Set up Docker Buildx
@@ -29,10 +33,10 @@ jobs:
           push: true
           tags: |
             ghcr.io/vzauartcc/roster-sync:${{ github.sha }}
-            ghcr.io/vzauartcc/roster-sync:master
-            ghcr.io/vzauartcc/roster-sync:buildcache
-          cache-from: type=registry,ref=ghcr.io/vzauartcc/roster-sync:buildcache
-          cache-to: type=registry,ref=ghcr.io/vzauartcc/roster-sync:buildcache,mode=max
+            ghcr.io/vzauartcc/roster-sync:latest
+            ghcr.io/vzauartcc/roster-sync:main
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   Deploy-to-Prod:
     needs: Build-and-Push
