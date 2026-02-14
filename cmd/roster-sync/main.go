@@ -277,7 +277,7 @@ func updateExistingUser(ctx context.Context, zUser zau.User, vUser vatusa.Contro
 
 	// Update user if core info changed
 	if vUser.FName != zUser.FName || vUser.LName != zUser.LName || vUser.Email != zUser.Email || vUser.BroadcastOptedIn != zUser.FlagBroadcastOptedIn || vUser.NamePrivacyEnabled != zUser.UseNamePrivacy {
-		log.Printf("Updating user core info for %d: fname %t, lname %t, email %t, broadcast %t, name privacy %t\n", zUser.CID, vUser.FName != zUser.FName, vUser.LName != zUser.LName, vUser.Email != zUser.Email, vUser.BroadcastOptedIn != zUser.FlagBroadcastOptedIn, vUser.NamePrivacyEnabled != zUser.UseNamePrivacy)
+		log.Printf("Updating user core info for %s %s (%d): fname %t, lname %t, email %t, broadcast %t, name privacy %t\n", vUser.FName, vUser.LName, zUser.CID, vUser.FName != zUser.FName, vUser.LName != zUser.LName, vUser.Email != zUser.Email, vUser.BroadcastOptedIn != zUser.FlagBroadcastOptedIn, vUser.NamePrivacyEnabled != zUser.UseNamePrivacy)
 
 		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/user/%d", vUser.CID), vUser.CID, zau.PatchControllerPayload{
 			FName:            vUser.FName,
@@ -293,7 +293,7 @@ func updateExistingUser(ctx context.Context, zUser zau.User, vUser vatusa.Contro
 
 	// Update membership if necessary
 	if !zUser.IsMember {
-		log.Printf("Adding user %d to roster\n", vUser.CID)
+		log.Printf("Adding user %s %s (%d) to roster\n", vUser.FName, vUser.LName, vUser.CID)
 
 		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/member", zUser.CID), zUser.CID, zau.MemberControllerPayload{
 			IsMember: true,
@@ -306,7 +306,7 @@ func updateExistingUser(ctx context.Context, zUser zau.User, vUser vatusa.Contro
 
 	// Update visiting status if necessary
 	if zUser.IsVisitor != isVisitor {
-		log.Printf("Updating user visit status for %d to %t\n", zUser.CID, isVisitor)
+		log.Printf("Updating user visit status for %s %s (%d) to %t\n", zUser.FName, zUser.LName, zUser.CID, isVisitor)
 
 		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/visit", zUser.CID), zUser.CID, zau.VisitControllerPayload{
 			IsVisitor: isVisitor,
@@ -318,7 +318,7 @@ func updateExistingUser(ctx context.Context, zUser zau.User, vUser vatusa.Contro
 
 	// Update rating status if necessary
 	if zUser.Rating != vUser.Rating {
-		log.Printf("Updating user rating for %d to %d from %d\n", zUser.CID, vUser.Rating, zUser.Rating)
+		log.Printf("Updating user rating for %s %s (%d) from %d to %d\n", zUser.FName, zUser.LName, zUser.CID, zUser.Rating, vUser.Rating)
 
 		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/rating", zUser.CID), zUser.CID, zau.RatingControllerPayload{
 			Rating: vUser.Rating,
