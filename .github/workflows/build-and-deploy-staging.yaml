@@ -3,7 +3,7 @@ name: Build and Deploy Staging
 on:
   push:
     branches:
-      - "development"
+      - "staging"
     paths:
       - "**.go"
       - "go.mod"
