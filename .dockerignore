@@ -1,7 +1,9 @@
 # --- Standard Version Control and IDE Files ---
 
 .git
+.gitattributes
 .gitignore
+.github
 .svn
 .hg
 .idea
@@ -9,6 +11,8 @@
 Thumbs.db
 
 # --- Go Specific Files/Directories to Ignore ---
+
+.golangci.yml
 
 # Go module cache: Not needed inside the builder, as 'go mod download' handles it.
 
@@ -18,9 +22,9 @@ vendor/
 
 # Ignore any other default local binary names.
 
-_.exe
-_.test
-\*.prof
+**/*.exe
+**/*.test
+*.prof
 
 # --- Local Environment and Cache ---
 
@@ -32,8 +36,8 @@ temp/
 
 # Log files and temporary files
 
-_.log
-_~
+**/*.log
+**/*~
 
 # --- Docker Files Themselves ---
 
@@ -42,3 +46,8 @@ _~
 Dockerfile
 docker-compose.yml
 .dockerignore
+
+# --- Other Files ---
+
+*.md
+doppler-template.yaml
