@@ -67,6 +67,10 @@ func FetchData(ctx context.Context) Roster {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return Roster{}
+	}
+
 	var zauData Roster
 
 	err = json.NewDecoder(resp.Body).Decode(&zauData)
