@@ -23,6 +23,7 @@ type User struct {
 	LName                string     `json:"lname"`
 	Email                string     `json:"email"`
 	Rating               int        `json:"rating"`
+	HomeFacility         string     `json:"homeFacility"`
 	OI                   *string    `json:"oi,omitempty"`
 	FlagBroadcastOptedIn bool       `json:"broadcast"`
 	IsMember             bool       `json:"member"`
@@ -65,7 +66,8 @@ type MemberControllerPayload struct {
 }
 
 type VisitControllerPayload struct {
-	IsVisitor bool `json:"vis"`
+	IsVisitor    bool   `json:"vis"`
+	HomeFacility string `json:"homeFacility"`
 }
 
 type RatingControllerPayload struct {

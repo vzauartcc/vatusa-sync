@@ -309,7 +309,20 @@ func updateExistingUser(ctx context.Context, zUser zau.User, vUser vatusa.Contro
 		log.Printf("Updating user visit status for %s %s (%d) to %t\n", zUser.FName, zUser.LName, zUser.CID, isVisitor)
 
 		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/visit", zUser.CID), zUser.CID, zau.VisitControllerPayload{
-			IsVisitor: isVisitor,
+			IsVisitor:    isVisitor,
+			HomeFacility: vUser.Facility,
+		})
+		if err == nil {
+			visit = true
+		}
+	}
+
+	if isVisitor && zUser.HomeFacility != vUser.Facility {
+		log.Printf("Updating user home facility for %s %s (%d) to %s\n", zUser.FName, zUser.LName, zUser.CID, vUser.Facility)
+
+		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/visit", zUser.CID), zUser.CID, zau.VisitControllerPayload{
+			IsVisitor:    isVisitor,
+			HomeFacility: vUser.Facility,
 		})
 		if err == nil {
 			visit = true
