@@ -17,8 +17,12 @@ import (
 	"github.com/vzauartcc/roster-sync/internal/zau"
 )
 
+func getEnvVariable(key string) string {
+	return strings.TrimSpace(os.Getenv(key))
+}
+
 func main() {
-	if os.Getenv("ZAU_API_URL") == "" || os.Getenv("ZAU_API_KEY") == "" || os.Getenv("VATUSA_API_KEY") == "" {
+	if getEnvVariable("ZAU_API_URL") == "" || getEnvVariable("ZAU_API_KEY") == "" || getEnvVariable("VATUSA_API_KEY") == "" {
 		panic("Missing at least one environment variable. Check to make sure the following are set: 'VATUSA_API_KEY', 'ZAU_API_KEY', 'ZAU_API_URL'.")
 	}
 
@@ -36,7 +40,7 @@ func main() {
 
 	runner.Start()
 
-	if os.Getenv("LOCAL_DEV_ENVIRONMENT") != "" {
+	if getEnvVariable("LOCAL_DEV_ENVIRONMENT") != "" {
 		log.Println("Invoked from script, running initial sync")
 
 		go doRosterSync(ctx)
@@ -309,7 +313,20 @@ func updateExistingUser(ctx context.Context, zUser zau.User, vUser vatusa.Contro
 		log.Printf("Updating user visit status for %s %s (%d) to %t\n", zUser.FName, zUser.LName, zUser.CID, isVisitor)
 
 		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/visit", zUser.CID), zUser.CID, zau.VisitControllerPayload{
-			IsVisitor: isVisitor,
+			IsVisitor:    isVisitor,
+			HomeFacility: vUser.Facility,
+		})
+		if err == nil {
+			visit = true
+		}
+	}
+
+	if isVisitor && zUser.HomeFacility != vUser.Facility {
+		log.Printf("Updating user home facility for %s %s (%d) to %s\n", zUser.FName, zUser.LName, zUser.CID, vUser.Facility)
+
+		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/visit", zUser.CID), zUser.CID, zau.VisitControllerPayload{
+			IsVisitor:    isVisitor,
+			HomeFacility: vUser.Facility,
 		})
 		if err == nil {
 			visit = true

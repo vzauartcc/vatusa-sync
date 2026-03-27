@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	vatusaURL     = "https://api.vatusa.net/v2/facility/ZAU/roster/both"
-	ErrMissingEnv = errors.New("missing environment variables")
+	vatusaURL        = "https://api.vatusa.net/v2/facility/ZAU/roster/both"
+	ErrMissingEnv    = errors.New("missing environment variables")
+	ErrInvalidStatus = errors.New("invalid status code returned")
 )
 
 func FetchData(ctx context.Context) ([]Controller, error) {
@@ -36,6 +37,10 @@ func FetchData(ctx context.Context) ([]Controller, error) {
 		return []Controller{}, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return []Controller{}, fmt.Errorf("%w: %s", ErrInvalidStatus, resp.Status)
+	}
 
 	var vatusaData Roster
 

@@ -67,6 +67,10 @@ func FetchData(ctx context.Context) Roster {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return Roster{}
+	}
+
 	var zauData Roster
 
 	err = json.NewDecoder(resp.Body).Decode(&zauData)
@@ -123,7 +127,7 @@ func NewZauAuthRequest(ctx context.Context, method, path string, body io.Reader)
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+os.Getenv("ZAU_API_KEY"))
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(os.Getenv("ZAU_API_KEY")))
 
 	if method != http.MethodGet && method != http.MethodHead && req.Header.Get("Content-Type") == "" {
 		// Set Content-Type for non-GET requests
