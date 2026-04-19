@@ -1,7 +1,7 @@
 # Make sure to enable 'Require status checks to pass before merging' on the branch protection,
-# and to select the 'gofmt_check' action.
+# and to select the 'CI Check' action.
 
-name: Prettier Check
+name: CI Check
 
 on:
   pull_request:
@@ -14,12 +14,11 @@ on:
 permissions: {}
 
 jobs:
-  gofmt_check:
+  Verify-App-Builds-and-Tests:
     runs-on: ubuntu-latest
-    if: github.actor != 'renovate[bot]'
 
     steps:
-      - name: Checkout main
+      - name: Checkout code
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           persist-credentials: false
@@ -29,10 +28,14 @@ jobs:
         with:
           go-version-file: "go.mod"
 
-      - name: Run go fmt
-        run: |
-          if [ -n "$(go fmt ./...)" ]; then
-            echo "The following files are not formatted correctly:"
-            go fmt ./...
-            exit 1
-          fi
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Verify Dependencies
+        run: go mod verify
+
+      - name: Build App
+        run: go build -v ./...
+
+      - name: Run Tests
+        run: go test -v -race -cover ./...
