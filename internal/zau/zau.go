@@ -19,11 +19,19 @@ var (
 )
 
 func SendData(ctx context.Context, method, path string, cid int, data any) error {
-	payload, err := json.Marshal(data)
-	if err != nil {
-		log.Printf("Error marshalling %s payload for CID %d: %v\n", method, cid, err)
+	var payload []byte
 
-		return err
+	var err error
+
+	if data == nil {
+		payload = []byte("{}")
+	} else {
+		payload, err = json.Marshal(data)
+		if err != nil {
+			log.Printf("Error marshalling %s payload for CID %d: %v\n", method, cid, err)
+
+			return err
+		}
 	}
 
 	bodyReader := bytes.NewReader(payload)

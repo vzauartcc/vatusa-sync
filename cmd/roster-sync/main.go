@@ -295,19 +295,6 @@ func updateExistingUser(ctx context.Context, zUser zau.User, vUser vatusa.Contro
 		}
 	}
 
-	// Update membership if necessary
-	if !zUser.IsMember {
-		log.Printf("Adding user %s %s (%d) to roster\n", vUser.FName, vUser.LName, vUser.CID)
-
-		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/member", zUser.CID), zUser.CID, zau.MemberControllerPayload{
-			IsMember: true,
-			JoinDate: vUser.FacilityJoinDate,
-		})
-		if err == nil {
-			membership = true
-		}
-	}
-
 	// Update visiting status if necessary
 	if zUser.IsVisitor != isVisitor {
 		log.Printf("Updating user visit status for %s %s (%d) to %t\n", zUser.FName, zUser.LName, zUser.CID, isVisitor)
@@ -318,6 +305,19 @@ func updateExistingUser(ctx context.Context, zUser zau.User, vUser vatusa.Contro
 		})
 		if err == nil {
 			visit = true
+		}
+	}
+
+	// Update membership if necessary
+	if !zUser.IsMember {
+		log.Printf("Adding user %s %s (%d) to roster\n", vUser.FName, vUser.LName, vUser.CID)
+
+		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/member", zUser.CID), zUser.CID, zau.MemberControllerPayload{
+			IsMember: true,
+			JoinDate: vUser.FacilityJoinDate,
+		})
+		if err == nil {
+			membership = true
 		}
 	}
 

@@ -1,12 +1,18 @@
 name: Delete old workflow runs
 on:
   schedule:
-    - cron: '0 0 1 * *'
+    - cron: "0 0 1 * *"
 # Run monthly, at 00:00 on the 1st day of month.
+
+permissions: {}
 
 jobs:
   del_runs:
     runs-on: ubuntu-latest
+
+    permissions:
+      actions: write
+
     steps:
       - name: Delete workflow runs
         uses: Mattraks/delete-workflow-runs@e284f4ef7fbf76101a8421891fbd6e1ee66ef374 # v2

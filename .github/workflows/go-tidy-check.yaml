@@ -1,22 +1,16 @@
 # Make sure to enable 'Require status checks to pass before merging' on the branch protection,
-# and to select the 'gofmt_check' action.
+# and to select the 'go-tidy-check' action.
 
-name: Format Check
-
+name: Go Tidy Check
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    paths:
-      - "**.go"
-      - "go.mod"
-      - "go.sum"
 
 permissions: {}
 
 jobs:
-  gofmt_check:
+  go-tidy-check:
     runs-on: ubuntu-latest
-    if: github.actor != 'renovate[bot]'
 
     steps:
       - name: Checkout main
@@ -29,10 +23,9 @@ jobs:
         with:
           go-version-file: "go.mod"
 
-      - name: Run go fmt
-        run: |
-          if [ -n "$(go fmt ./...)" ]; then
-            echo "The following files are not formatted correctly:"
-            go fmt ./...
-            exit 1
-          fi
+      - name: Run go mod tidy
+        run: go mod tidy
+
+        # If 'go mod tidy' changed anything, git status will be dirty, and this command exits with code 1
+      - name: Check for changes
+        run: git diff --exit-code go.mod go.sum
