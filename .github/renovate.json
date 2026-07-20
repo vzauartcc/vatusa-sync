@@ -35,5 +35,6 @@
       "groupName": "all minor and patch updates",
       "automerge": false
     }
-  ]
+  ],
+  "postUpdateOptions": ["gomodTidy"]
 }
