@@ -6,48 +6,63 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
-	"strings"
 	"time"
 )
 
 var (
-	vatusaURL        = "https://api.vatusa.net/v2/facility/ZAU/roster/both"
 	ErrMissingEnv    = errors.New("missing environment variables")
 	ErrInvalidStatus = errors.New("invalid status code returned")
 )
 
-func FetchData(ctx context.Context) ([]Controller, error) {
-	apiKey := strings.TrimSpace(os.Getenv("VATUSA_API_KEY"))
-	if apiKey == "" {
-		return []Controller{}, ErrMissingEnv
+type Client struct {
+	url    string
+	apiKey string
+	hc     *http.Client
+}
+
+func NewClient(url, apiKey string, httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 10 * time.Second}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s?apikey=%s&t=%d", vatusaURL, apiKey, time.Now().UnixMilli()), nil)
-	if err != nil {
-		log.Printf("Error creating request for VATUSA data: %v\n", err)
-		return []Controller{}, err
+	return &Client{
+		url:    url,
+		apiKey: apiKey,
+		hc:     httpClient,
+	}
+}
+
+func (c *Client) FetchRoster(ctx context.Context) ([]Controller, error) {
+	if c.apiKey == "" || c.url == "" {
+		return nil, ErrMissingEnv
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		fmt.Sprintf("%s?apikey=%s&t=%d", c.url, c.apiKey, time.Now().UnixMilli()),
+		nil,
+	)
 	if err != nil {
-		log.Printf("Error fetching VATUSA data: %v\n", err)
-		return []Controller{}, err
+		return nil, err
+	}
+
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return []Controller{}, fmt.Errorf("%w: %s", ErrInvalidStatus, resp.Status)
+		return nil, fmt.Errorf("%w: %s", ErrInvalidStatus, resp.Status)
 	}
 
 	var vatusaData Roster
 
 	err = json.NewDecoder(resp.Body).Decode(&vatusaData)
 	if err != nil {
-		log.Printf("Error unmarshaling VATUSA data: %v\n", err)
-		return []Controller{}, err
+		return nil, err
 	}
 
 	return vatusaData.Data, nil
