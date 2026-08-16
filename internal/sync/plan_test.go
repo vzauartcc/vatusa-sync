@@ -200,6 +200,44 @@ func TestPlanNoRoleUpdateWhenNoNewRoles(t *testing.T) {
 	assertNoOp(t, ops, OpUpdateRoles)
 }
 
+func TestPlanNoRoleUpdateWhenZauUserHasExtraRole(t *testing.T) {
+	roster := zau.Roster{Home: []zau.User{zUser(1000001, true, false, []string{"atm", "ia"})}}
+	vUser := vController(1000001, "home", []string{"ATM"}, "ZAU")
+
+	ops := Plan(roster, []vatusa.Controller{vUser}, []string{"atm", "ec"}, fixedNow)
+
+	if len(ops) != 0 {
+		t.Errorf("expected no ops, got %+v", ops)
+	}
+}
+
+func TestPlanNoRoleUpdateWhenCurrentRoleCodesUppercase(t *testing.T) {
+	roster := zau.Roster{Home: []zau.User{zUser(1000001, true, false, []string{"ATM"})}}
+	vUser := vController(1000001, "home", []string{"ATM"}, "ZAU")
+
+	ops := Plan(roster, []vatusa.Controller{vUser}, []string{"atm"}, fixedNow)
+
+	if len(ops) != 0 {
+		t.Errorf("expected no ops, got %+v", ops)
+	}
+}
+
+func TestPlanRoleUpdateMergesLowercaseWhenCurrentUppercase(t *testing.T) {
+	roster := zau.Roster{Home: []zau.User{zUser(1000001, true, false, []string{"ATM"})}}
+	vUser := vController(1000001, "home", []string{"ATM", "EC"}, "ZAU")
+
+	ops := Plan(roster, []vatusa.Controller{vUser}, []string{"atm", "ec"}, fixedNow)
+
+	if len(ops) != 1 || ops[0].Kind != OpUpdateRoles {
+		t.Fatalf("expected 1 role update op, got %+v", ops)
+	}
+
+	want := []string{"atm", "ec"}
+	if !slices.Equal(ops[0].Roles, want) {
+		t.Errorf("expected roles %v, got %v", want, ops[0].Roles)
+	}
+}
+
 func TestPlanEmitsRemoveMemberForMissingCID(t *testing.T) {
 	roster := zau.Roster{Home: []zau.User{zUser(1000001, true, false, []string{"atm"})}}
 

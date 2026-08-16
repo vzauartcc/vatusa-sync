@@ -157,24 +157,34 @@ func filterRoles(roles []vatusa.Role, available map[string]bool) []string {
 }
 
 // addNewRoles appends roles to the current set, preserving existing roles and
-// never removing any.
+// never removing any. Role codes are normalized to lowercase on both sides so
+// the membership check is case-insensitive against the VATUSA-side roles,
+// which are already lowercased by filterRoles.
 func addNewRoles(current []string, newRoles []string) []string {
 	seen := make(map[string]bool, len(current)+len(newRoles))
 
 	merged := make([]string, 0, len(current)+len(newRoles))
-	merged = append(merged, current...)
 
 	for _, role := range current {
-		seen[role] = true
-	}
+		lcRole := strings.ToLower(role)
 
-	for _, role := range newRoles {
-		if seen[role] {
+		if seen[lcRole] {
 			continue
 		}
 
-		seen[role] = true
-		merged = append(merged, role)
+		seen[lcRole] = true
+		merged = append(merged, lcRole)
+	}
+
+	for _, role := range newRoles {
+		lcRole := strings.ToLower(role)
+
+		if seen[lcRole] {
+			continue
+		}
+
+		seen[lcRole] = true
+		merged = append(merged, lcRole)
 	}
 
 	return merged
