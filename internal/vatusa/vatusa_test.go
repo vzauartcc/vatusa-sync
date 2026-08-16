@@ -95,3 +95,27 @@ func TestCertSyncDateUnmarshal(t *testing.T) {
 		t.Fatalf("unexpected error on null: %v", err)
 	}
 }
+
+func TestCertSyncDateUnmarshalInvalidFormat(t *testing.T) {
+	var date CertSyncDate
+
+	err := date.UnmarshalJSON([]byte(`"not a timestamp"`))
+	if err == nil {
+		t.Fatal("expected error on invalid date format")
+	}
+}
+
+func TestFetchRosterReturnsErrorOnInvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`not json`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "secret", nil)
+
+	_, err := client.FetchRoster(context.Background())
+	if err == nil {
+		t.Fatal("expected error on invalid JSON")
+	}
+}
