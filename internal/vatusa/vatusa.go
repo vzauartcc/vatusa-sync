@@ -41,7 +41,7 @@ func (c *Client) FetchRoster(ctx context.Context) ([]Controller, error) {
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
-		fmt.Sprintf("%s?apikey=%s&t=%d", c.url, c.apiKey, time.Now().UnixMilli()),
+		fmt.Sprintf("%s/facility/ZAU/roster/both?apikey=%s&t=%d", c.url, c.apiKey, time.Now().UnixMilli()),
 		nil,
 	)
 	if err != nil {

@@ -18,10 +18,11 @@ func TestNewClientDefaultsToTimeout(t *testing.T) {
 }
 
 func TestFetchRosterBuildsURLAndDecodes(t *testing.T) {
-	var gotPath string
+	var gotPath, gotURLPath string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.RawQuery
+		gotURLPath = r.URL.Path
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"testing":false,"data":[{"cid":1234567,"fname":"John","lname":"Doe","email":"john@example.com","facility":"ZAU","rating":3,"membership":"home"}]}`))
@@ -33,6 +34,10 @@ func TestFetchRosterBuildsURLAndDecodes(t *testing.T) {
 	controllers, err := client.FetchRoster(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotURLPath != "/facility/ZAU/roster/both" {
+		t.Errorf("expected path /facility/ZAU/roster/both, got %q", gotURLPath)
 	}
 
 	if !strings.Contains(gotPath, "apikey=secret") {
