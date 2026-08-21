@@ -73,3 +73,7 @@ type VisitControllerPayload struct {
 type RatingControllerPayload struct {
 	Rating int `json:"rating"`
 }
+
+type RolesControllerPayload struct {
+	Roles []string `json:"roles"`
+}

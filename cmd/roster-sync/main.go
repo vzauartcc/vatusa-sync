@@ -2,50 +2,83 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
-	"net/http"
+	"log/slog"
 	"os"
 	"os/signal"
-	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/robfig/cron/v3"
 
+	"github.com/vzauartcc/roster-sync/internal/config"
+	rostersync "github.com/vzauartcc/roster-sync/internal/sync"
 	"github.com/vzauartcc/roster-sync/internal/vatusa"
 	"github.com/vzauartcc/roster-sync/internal/zau"
 )
 
-func getEnvVariable(key string) string {
-	return strings.TrimSpace(os.Getenv(key))
-}
+const (
+	syncSchedule = "*/10 * * * *"
+	runTimeout   = 5 * time.Minute
+)
 
 func main() {
-	if getEnvVariable("ZAU_API_URL") == "" || getEnvVariable("ZAU_API_KEY") == "" || getEnvVariable("VATUSA_API_KEY") == "" {
-		panic("Missing at least one environment variable. Check to make sure the following are set: 'VATUSA_API_KEY', 'ZAU_API_KEY', 'ZAU_API_URL'.")
-	}
+	slog.SetDefault(
+		slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})),
+	)
 
-	log.Println("roster-sync starting. . . .")
+	cfg := config.Load()
+
+	slog.Info("roster-sync starting")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	runner := cron.New(cron.WithChain(cron.Recover(cron.DefaultLogger)))
-
-	err := setupScheduler(ctx, runner, doRosterSync)
+	loc, err := time.LoadLocation("America/Chicago")
 	if err != nil {
-		panic(err)
+		fatal("failed to load timezone", err)
+	}
+
+	vatusaClient := vatusa.NewClient(cfg.VatusaAPIURL, cfg.VatusaAPIKey, nil)
+	zauClient := zau.NewClient(cfg.ZauAPIURL, cfg.ZauAPIKey, nil)
+
+	var runMutex sync.Mutex
+
+	run := func() {
+		runMutex.Lock()
+		defer runMutex.Unlock()
+
+		runCtx, runCancel := context.WithTimeout(ctx, runTimeout)
+		defer runCancel()
+
+		result, err := rostersync.Run(runCtx, vatusaClient, zauClient, time.Now())
+		if err != nil {
+			slog.Error("roster sync failed", "error", err)
+
+			return
+		}
+
+		logCounts(result)
+	}
+
+	runner := cron.New(
+		cron.WithChain(cron.Recover(cronLogger{})),
+		cron.WithLocation(loc),
+	)
+
+	_, err = runner.AddFunc(syncSchedule, run)
+	if err != nil {
+		fatal("failed to schedule roster sync", err)
 	}
 
 	runner.Start()
 
-	if getEnvVariable("LOCAL_DEV_ENVIRONMENT") != "" {
-		log.Println("Invoked from script, running initial sync")
+	if cfg.LocalDevEnv != "" {
+		slog.Info("invoked from script, running initial sync")
 
-		go doRosterSync(ctx)
+		go run()
 	} else {
-		log.Println("Sleeping until next run. . . .")
+		slog.Info("sleeping until next run")
 	}
 
 	sigs := make(chan os.Signal, 1)
@@ -53,338 +86,70 @@ func main() {
 
 	<-sigs
 
-	log.Println("roster-sync shutting down. . . .")
+	slog.Info("roster-sync shutting down")
+
+	cancel()
 
 	stopCtx := runner.Stop()
 
 	<-stopCtx.Done()
 
-	log.Println("Bye!")
+	slog.Info("bye")
 }
 
-func setupScheduler(ctx context.Context, runner *cron.Cron, job func(context.Context)) error {
-	_, err := runner.AddFunc("*/10 * * * *", func() {
-		go job(ctx)
-	})
-
-	return err
+func fatal(msg string, err error) {
+	slog.Error(msg, "error", err)
+	os.Exit(1)
 }
 
-func doRosterSync(ctx context.Context) {
-	zauControllers, vatusaControllers, failed := getControllers(ctx)
-	if failed {
+func logCounts(result rostersync.Result) {
+	attrs := make([]any, 0, 8)
+
+	if result.Added > 0 {
+		attrs = append(attrs, "added", result.Added)
+	}
+
+	if result.MadeMember > 0 {
+		attrs = append(attrs, "madeMember", result.MadeMember)
+	}
+
+	if result.MadeVisitor > 0 {
+		attrs = append(attrs, "madeVisitor", result.MadeVisitor)
+	}
+
+	if result.UpdatedCore > 0 {
+		attrs = append(attrs, "updatedCore", result.UpdatedCore)
+	}
+
+	if result.UpdatedRating > 0 {
+		attrs = append(attrs, "updatedRating", result.UpdatedRating)
+	}
+
+	if result.UpdatedRoles > 0 {
+		attrs = append(attrs, "updatedRoles", result.UpdatedRoles)
+	}
+
+	if result.RemovedMember > 0 {
+		attrs = append(attrs, "removedMember", result.RemovedMember)
+	}
+
+	if result.CertsRemoved > 0 {
+		attrs = append(attrs, "certsRemoved", result.CertsRemoved)
+	}
+
+	if len(attrs) == 0 {
 		return
 	}
 
-	allZauControllers, zauCertRemovalCIDs, makeNonMember := generateRosterSyncSlices(zauControllers, vatusaControllers)
-
-	added := 0
-	madeMember := 0
-	madeVisitor := 0
-	updatedCore := 0
-	updatedRating := 0
-
-	for _, vUser := range vatusaControllers {
-		var zUser *zau.User
-
-		for i := range allZauControllers {
-			z := &allZauControllers[i]
-
-			if z.CID == vUser.CID {
-				zUser = z
-				break
-			}
-		}
-
-		isVisitor := vUser.Membership != "home"
-
-		if zUser == nil {
-			// New User
-			log.Printf("Creating new user for %s %s (%d)\n", vUser.FName, vUser.LName, vUser.CID)
-
-			err := createNewUser(ctx, vUser, isVisitor)
-			if err == nil {
-				added++
-			}
-
-			continue
-		}
-
-		// Existing User, update as necessary
-		core, membership, vis, rating := updateExistingUser(ctx, *zUser, vUser, isVisitor)
-
-		if core {
-			updatedCore++
-		}
-
-		if membership {
-			madeMember++
-		}
-
-		if vis {
-			madeVisitor++
-		}
-
-		if rating {
-			updatedRating++
-		}
-	}
-
-	removedMember := removeMembers(ctx, makeNonMember)
-
-	certsRemoved := removeCerts(ctx, zauCertRemovalCIDs)
-
-	if added > 0 {
-		log.Printf("Added %d new users.\n", added)
-	}
-
-	if madeMember > 0 {
-		log.Printf("Made %d users into members.\n", madeMember)
-	}
-
-	if madeVisitor > 0 {
-		log.Printf("Changed %d users' visiting status.\n", madeVisitor)
-	}
-
-	if updatedCore > 0 {
-		log.Printf("Updated %d users' core data.\n", updatedCore)
-	}
-
-	if updatedRating > 0 {
-		log.Printf("Updated %d users' ratings.\n", updatedRating)
-	}
-
-	if removedMember > 0 {
-		log.Printf("Removed %d users from the roster.\n", removedMember)
-	}
-
-	if certsRemoved > 0 {
-		log.Printf("Removed %d expired certs for non-member users.\n\n\n", certsRemoved)
-	}
+	slog.Info("roster sync complete", attrs...)
 }
 
-func getControllers(ctx context.Context) (zau.Roster, []vatusa.Controller, bool) {
-	vatusaControllers, err := vatusa.FetchData(ctx)
+type cronLogger struct{}
 
-	if err != nil || len(vatusaControllers) == 0 {
-		log.Printf("Failed to fetch VATUSA controllers: %v\n", err)
-
-		return zau.Roster{}, nil, true
-	}
-
-	zauControllers := zau.FetchData(ctx)
-	if len(zauControllers.Home) == 0 {
-		log.Printf("Failed to fetch ZAU controllers: %v\n", err)
-
-		return zau.Roster{}, nil, true
-	}
-
-	return zauControllers, vatusaControllers, false
+func (cronLogger) Info(msg string, keysAndValues ...any) {
+	slog.Info(msg, keysAndValues...)
 }
 
-func generateRosterSyncSlices(zauControllers zau.Roster, vatusaControllers []vatusa.Controller) ([]zau.User, []int, []int) {
-	sixMonthsAgo := time.Now().AddDate(0, -6, -1)
-	zauMemberCIDs := make([]int, 0)
-
-	allZauControllers := zauControllers.Home
-	allZauControllers = append(allZauControllers, zauControllers.Visiting...)
-	allZauControllers = append(allZauControllers, zauControllers.Removed...)
-
-	for _, controller := range allZauControllers {
-		if controller.IsMember {
-			zauMemberCIDs = append(zauMemberCIDs, controller.CID)
-		}
-	}
-
-	zauCertRemovalCIDs := make([]int, 0)
-
-	for _, controller := range zauControllers.Removed {
-		if controller.RemovalDate == nil {
-			continue // Skip if removalDate is missing
-		}
-
-		isOlderThanSixMonths := controller.RemovalDate.Before(sixMonthsAgo)
-
-		hasCertCodes := len(controller.CertCodes) > 0
-
-		if isOlderThanSixMonths && hasCertCodes {
-			zauCertRemovalCIDs = append(zauCertRemovalCIDs, controller.CID)
-		}
-	}
-
-	vatusaAllCIDs := make([]int, 0)
-
-	for _, controller := range vatusaControllers {
-		vatusaAllCIDs = append(vatusaAllCIDs, controller.CID)
-	}
-
-	makeNonMember := make([]int, 0)
-
-	vatusaCidMap := make(map[int]bool, len(vatusaAllCIDs))
-	for _, cid := range vatusaAllCIDs {
-		vatusaCidMap[cid] = true
-	}
-
-	for _, cid := range zauMemberCIDs {
-		if _, exists := vatusaCidMap[cid]; !exists {
-			makeNonMember = append(makeNonMember, cid)
-		}
-	}
-
-	return allZauControllers, zauCertRemovalCIDs, makeNonMember
-}
-func createNewUser(ctx context.Context, vUser vatusa.Controller, isVisitor bool) error {
-	availableRoles := zau.FetchRoles(ctx)
-	// Create list of available roles
-	availableRolesMap := make(map[string]bool, len(availableRoles))
-	for _, role := range availableRoles {
-		availableRolesMap[strings.ToLower(role)] = true
-	}
-
-	assignableRoles := make([]string, 0, len(vUser.Roles))
-
-	for _, userRole := range vUser.Roles {
-		lcRole := strings.ToLower(userRole.Role)
-
-		if availableRolesMap[lcRole] {
-			assignableRoles = append(assignableRoles, lcRole)
-		}
-	}
-
-	return zau.SendData(ctx, http.MethodPost, fmt.Sprintf("/controller/%d", vUser.CID), vUser.CID, zau.PostControllerPayload{
-		CID:              vUser.CID,
-		FName:            vUser.FName,
-		LName:            vUser.LName,
-		Rating:           vUser.Rating,
-		HomeFacility:     vUser.Facility,
-		Email:            vUser.Email,
-		BroadcastOptedIn: vUser.BroadcastOptedIn,
-		IsMember:         true,
-		IsVisitor:        isVisitor,
-		RoleCodes: func() []string {
-			if !isVisitor {
-				return assignableRoles
-			}
-
-			return []string{}
-		}(),
-		JoinDate:       vUser.FacilityJoinDate,
-		UseNamePrivacy: vUser.NamePrivacyEnabled,
-	})
-}
-
-func updateExistingUser(ctx context.Context, zUser zau.User, vUser vatusa.Controller, isVisitor bool) (bool, bool, bool, bool) {
-	coreInfo := false
-	membership := false
-	visit := false
-	rating := false
-
-	// Update user if core info changed
-	if vUser.FName != zUser.FName || vUser.LName != zUser.LName || vUser.Email != zUser.Email || vUser.BroadcastOptedIn != zUser.FlagBroadcastOptedIn || vUser.NamePrivacyEnabled != zUser.UseNamePrivacy {
-		log.Printf("Updating user core info for %s %s (%d): fname %t, lname %t, email %t, broadcast %t, name privacy %t\n", vUser.FName, vUser.LName, zUser.CID, vUser.FName != zUser.FName, vUser.LName != zUser.LName, vUser.Email != zUser.Email, vUser.BroadcastOptedIn != zUser.FlagBroadcastOptedIn, vUser.NamePrivacyEnabled != zUser.UseNamePrivacy)
-
-		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/user/%d", vUser.CID), vUser.CID, zau.PatchControllerPayload{
-			FName:            vUser.FName,
-			LName:            vUser.LName,
-			Email:            vUser.Email,
-			BroadcastOptedIn: vUser.BroadcastOptedIn,
-			UseNamePrivacy:   vUser.NamePrivacyEnabled,
-		})
-		if err == nil {
-			coreInfo = true
-		}
-	}
-
-	// Update visiting status if necessary
-	if zUser.IsVisitor != isVisitor {
-		log.Printf("Updating user visit status for %s %s (%d) to %t\n", zUser.FName, zUser.LName, zUser.CID, isVisitor)
-
-		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/visit", zUser.CID), zUser.CID, zau.VisitControllerPayload{
-			IsVisitor:    isVisitor,
-			HomeFacility: vUser.Facility,
-		})
-		if err == nil {
-			visit = true
-		}
-	}
-
-	// Update membership if necessary
-	if !zUser.IsMember {
-		log.Printf("Adding user %s %s (%d) to roster\n", vUser.FName, vUser.LName, vUser.CID)
-
-		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/member", zUser.CID), zUser.CID, zau.MemberControllerPayload{
-			IsMember: true,
-			JoinDate: vUser.FacilityJoinDate,
-		})
-		if err == nil {
-			membership = true
-		}
-	}
-
-	if isVisitor && zUser.HomeFacility != vUser.Facility {
-		log.Printf("Updating user home facility for %s %s (%d) to %s\n", zUser.FName, zUser.LName, zUser.CID, vUser.Facility)
-
-		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/visit", zUser.CID), zUser.CID, zau.VisitControllerPayload{
-			IsVisitor:    isVisitor,
-			HomeFacility: vUser.Facility,
-		})
-		if err == nil {
-			visit = true
-		}
-	}
-
-	// Update rating status if necessary
-	if zUser.Rating != vUser.Rating {
-		log.Printf("Updating user rating for %s %s (%d) from %d to %d\n", zUser.FName, zUser.LName, zUser.CID, zUser.Rating, vUser.Rating)
-
-		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/rating", zUser.CID), zUser.CID, zau.RatingControllerPayload{
-			Rating: vUser.Rating,
-		})
-		if err == nil {
-			rating = true
-		}
-	}
-
-	return coreInfo, membership, visit, rating
-}
-
-func removeMembers(ctx context.Context, makeNonMember []int) int {
-	if len(makeNonMember) == 0 {
-		return 0
-	}
-
-	retval := 0
-
-	for _, cid := range makeNonMember {
-		log.Printf("Removing user %d from roster\n", cid)
-
-		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/member", cid), cid, zau.MemberControllerPayload{
-			IsMember: false,
-			JoinDate: time.Now(), // Join date is ignored when removing members
-		})
-		if err == nil {
-			retval++
-		}
-	}
-
-	return retval
-}
-
-func removeCerts(ctx context.Context, zauCertRemovalCIDs []int) int {
-	if len(zauCertRemovalCIDs) == 0 {
-		return 0
-	}
-
-	retval := 0
-
-	for _, cid := range zauCertRemovalCIDs {
-		log.Printf("Removing certs for %d (6 months gone)\n", cid)
-
-		err := zau.SendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/remove-cert", cid), cid, nil)
-		if err == nil {
-			retval++
-		}
-	}
-
-	return retval
+func (cronLogger) Error(err error, msg string, keysAndValues ...any) {
+	slog.Error(msg, append(keysAndValues, "error", err)...)
 }
