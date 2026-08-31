@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -361,7 +360,7 @@ func (c *Client) generateJWT() string {
 
 	signer, err := jwt.NewSignerHS(jwt.HS256, key)
 	if err != nil {
-		log.Printf("Error generating JWT: %v\n", err)
+		slog.Error("error generating jwt", "error", err)
 
 		return ""
 	}
@@ -375,7 +374,7 @@ func (c *Client) generateJWT() string {
 
 	token, err := builder.Build(claims)
 	if err != nil {
-		log.Printf("Error signing JWT: %v\n", err)
+		slog.Error("error signing jwt", "error", err)
 
 		return ""
 	}
