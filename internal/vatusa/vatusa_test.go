@@ -13,8 +13,8 @@ import (
 func TestNewClientDefaultsToTimeout(t *testing.T) {
 	client := NewClient("https://vatusa.example.com", "key", nil)
 
-	if client.hc.Timeout != 10*time.Second {
-		t.Errorf("expected 10s timeout, got %v", client.hc.Timeout)
+	if client.hc.Timeout != 30*time.Second {
+		t.Errorf("expected 30s timeout, got %v", client.hc.Timeout)
 	}
 }
 

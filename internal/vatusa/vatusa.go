@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -23,7 +24,7 @@ type Client struct {
 
 func NewClient(url, apiKey string, httpClient *http.Client) *Client {
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 10 * time.Second}
+		httpClient = &http.Client{Timeout: 30 * time.Second}
 	}
 
 	return &Client{
@@ -34,16 +35,9 @@ func NewClient(url, apiKey string, httpClient *http.Client) *Client {
 }
 
 func (c *Client) FetchRoster(ctx context.Context) ([]Controller, error) {
-	if c.apiKey == "" || c.url == "" {
-		return nil, ErrMissingEnv
-	}
+	start := time.Now()
 
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		fmt.Sprintf("%s/facility/ZAU/roster/both?apikey=%s&t=%d", c.url, c.apiKey, time.Now().UnixMilli()),
-		nil,
-	)
+	req, err := c.newVatusaRequest(ctx, http.MethodGet, "/facility/ZAU/roster/both")
 	if err != nil {
 		return nil, err
 	}
@@ -65,20 +59,13 @@ func (c *Client) FetchRoster(ctx context.Context) ([]Controller, error) {
 		return nil, err
 	}
 
+	slog.Info("vatusa roster fetch complete", "duration_seconds", time.Since(start).Seconds())
+
 	return vatusaData.Data, nil
 }
 
 func (c *Client) FetchACE(ctx context.Context) ([]int, error) {
-	if c.apiKey == "" || c.url == "" {
-		return nil, ErrMissingEnv
-	}
-
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		fmt.Sprintf("%s/user/roles/ZHQ/ACE?apikey=%s&t=%d", c.url, c.apiKey, time.Now().UnixMilli()),
-		nil,
-	)
+	req, err := c.newVatusaRequest(ctx, http.MethodGet, "/user/roles/ZHQ/ACE")
 	if err != nil {
 		return nil, err
 	}
@@ -106,6 +93,27 @@ func (c *Client) FetchACE(ctx context.Context) ([]int, error) {
 	}
 
 	return cids, nil
+}
+
+func (c *Client) newVatusaRequest(ctx context.Context, method, path string) (*http.Request, error) {
+	if c.apiKey == "" || c.url == "" {
+		return nil, ErrMissingEnv
+	}
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		method,
+		fmt.Sprintf("%s%s?apikey=%s&t=%d", c.url, path, c.apiKey, time.Now().UnixMilli()),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "zau-roster-sync/1.0")
+
+	return req, nil
 }
 
 func (ct *CertSyncDate) UnmarshalJSON(byteSlice []byte) error {
