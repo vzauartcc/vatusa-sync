@@ -151,8 +151,8 @@ func TestSetRolesSendsPatchWithRoles(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if gotMethod != http.MethodPatch || gotPath != "/controller/1234567/roles" {
-		t.Errorf("expected PATCH /controller/1234567/roles, got %s %s", gotMethod, gotPath)
+	if gotMethod != http.MethodPut || gotPath != "/controller/1234567/roles" {
+		t.Errorf("expected PUT /controller/1234567/roles, got %s %s", gotMethod, gotPath)
 	}
 
 	if gotContentType != "application/json" {

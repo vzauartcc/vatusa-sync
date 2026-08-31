@@ -137,7 +137,7 @@ func (c *Client) SetRoles(ctx context.Context, cid int, roles []string) error {
 
 	return c.sendData(
 		ctx,
-		http.MethodPatch,
+		http.MethodPut,
 		fmt.Sprintf("/controller/%d/roles", cid),
 		cid,
 		RolesControllerPayload{

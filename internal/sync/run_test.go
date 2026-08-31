@@ -163,9 +163,9 @@ func TestRunUpdatesRolesWithExistingRolesIncluded(t *testing.T) {
 		t.Errorf("expected 1 role update, got %d", result.UpdatedRoles)
 	}
 
-	patch := findRequest(requests, http.MethodPatch, "/controller/1000001/roles")
+	patch := findRequest(requests, http.MethodPut, "/controller/1000001/roles")
 	if patch == nil {
-		t.Fatalf("expected PATCH /controller/1000001/roles, requests: %+v", *requests)
+		t.Fatalf("expected PUT /controller/1000001/roles, requests: %+v", *requests)
 	}
 
 	var payload zau.RolesControllerPayload
