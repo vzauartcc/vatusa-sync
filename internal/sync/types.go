@@ -16,6 +16,7 @@ const (
 	OpUpdateRoles
 	OpRemoveMember
 	OpRemoveCerts
+	OpAddACE
 )
 
 func (k OperationKind) String() string {
@@ -36,6 +37,8 @@ func (k OperationKind) String() string {
 		return "remove-member"
 	case OpRemoveCerts:
 		return "remove-certs"
+	case OpAddACE:
+		return "add-ace"
 	default:
 		return "unknown"
 	}
@@ -62,4 +65,5 @@ type Result struct {
 	UpdatedRoles  int
 	RemovedMember int
 	CertsRemoved  int
+	ACEGrants     int
 }

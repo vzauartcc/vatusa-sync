@@ -199,3 +199,66 @@ func checkCoreInfo(vUser vatusa.Controller, zUser zau.User) bool {
 func checkVisitingStatus(vUser vatusa.Controller, zUser zau.User, visiting bool) bool {
 	return zUser.IsVisitor != visiting || (visiting && zUser.HomeFacility != vUser.Facility)
 }
+
+// PlanACE computes the operations needed to grant the ACE role to ZAU users
+// who hold it in VATUSA. It never creates users: a user must already exist in
+// the ZAU roster to receive the role. The ACE role is merged into the user's
+// existing roles without removing any.
+func PlanACE(
+	zauRoster zau.Roster,
+	aceCIDs []int,
+	availableRoles []string,
+) []Operation {
+	allZauControllers := make([]zau.User, 0,
+		len(zauRoster.Home)+len(zauRoster.Visiting)+len(zauRoster.Removed))
+	allZauControllers = append(allZauControllers, zauRoster.Home...)
+	allZauControllers = append(allZauControllers, zauRoster.Visiting...)
+	allZauControllers = append(allZauControllers, zauRoster.Removed...)
+
+	zauByCID := make(map[int]zau.User, len(allZauControllers))
+	for _, controller := range allZauControllers {
+		if _, exists := zauByCID[controller.CID]; !exists {
+			zauByCID[controller.CID] = controller
+		}
+	}
+
+	if !hasRole(availableRoles, aceRole) {
+		return nil
+	}
+
+	ops := make([]Operation, 0)
+
+	for _, cid := range aceCIDs {
+		zUser, exists := zauByCID[cid]
+		if !exists {
+			continue
+		}
+
+		if hasRole(zUser.RoleCodes, aceRole) {
+			continue
+		}
+
+		ops = append(ops, Operation{
+			Kind:  OpAddACE,
+			CID:   cid,
+			ZUser: zUser,
+			Roles: addNewRoles(zUser.RoleCodes, []string{aceRole}),
+		})
+	}
+
+	return ops
+}
+
+// aceRole is the ZAU role code granted to VATUSA ACE members.
+const aceRole = "ace"
+
+// hasRole reports whether role appears in roles as a case-insensitive match.
+func hasRole(roles []string, role string) bool {
+	for _, r := range roles {
+		if strings.EqualFold(r, role) {
+			return true
+		}
+	}
+
+	return false
+}

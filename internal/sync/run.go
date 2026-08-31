@@ -51,6 +51,13 @@ func Run(ctx context.Context, vatusaClient *vatusa.Client, zauClient *zau.Client
 
 	ops := Plan(zauRoster, vatusaControllers, availableRoles, now)
 
+	aceCIDs, err := vatusaClient.FetchACE(ctx)
+	if err != nil {
+		slog.Warn("failed to fetch VATUSA ACE roster, continuing without ACE sync", "error", err)
+	} else {
+		ops = append(ops, PlanACE(zauRoster, aceCIDs, availableRoles)...)
+	}
+
 	result := apply(ctx, zauClient, ops, now)
 
 	return result, nil
@@ -134,6 +141,11 @@ func apply(ctx context.Context, zauClient *zau.Client, ops []Operation, now time
 			err = zauClient.RemoveCerts(ctx, operation.CID)
 			if err == nil {
 				result.CertsRemoved++
+			}
+		case OpAddACE:
+			err = zauClient.SetRoles(ctx, operation.CID, operation.Roles)
+			if err == nil {
+				result.ACEGrants++
 			}
 		}
 

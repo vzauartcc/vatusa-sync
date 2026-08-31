@@ -9,6 +9,14 @@ type Roster struct {
 	Data      []Controller `json:"data"`
 }
 
+type ACERoster struct {
+	Data []ACEMember `json:"data"`
+}
+
+type ACEMember struct {
+	CID int `json:"cid"`
+}
+
 type Role struct {
 	ID        int       `json:"id"`
 	CID       int       `json:"cid"`

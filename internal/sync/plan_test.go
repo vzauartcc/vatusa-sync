@@ -306,6 +306,80 @@ func TestPlanIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestPlanACEGrantsRoleToExistingUser(t *testing.T) {
+	roster := zau.Roster{Home: []zau.User{zUser(1000001, true, false, []string{"atm"})}}
+
+	ops := PlanACE(roster, []int{1000001}, []string{"atm", "ace"})
+
+	if len(ops) != 1 || ops[0].Kind != OpAddACE {
+		t.Fatalf("expected 1 add-ace op, got %+v", ops)
+	}
+
+	if ops[0].CID != 1000001 {
+		t.Errorf("expected cid 1000001, got %d", ops[0].CID)
+	}
+
+	want := []string{"atm", "ace"}
+	if !slices.Equal(ops[0].Roles, want) {
+		t.Errorf("expected roles %v, got %v", want, ops[0].Roles)
+	}
+}
+
+func TestPlanACESkipsNonExistentUser(t *testing.T) {
+	roster := zau.Roster{Home: []zau.User{zUser(1000001, true, false, nil)}}
+
+	ops := PlanACE(roster, []int{9999999}, []string{"ace"})
+
+	if len(ops) != 0 {
+		t.Errorf("expected no ops for non-existent user, got %+v", ops)
+	}
+}
+
+func TestPlanACESkipsUserWhoAlreadyHasACE(t *testing.T) {
+	roster := zau.Roster{Home: []zau.User{zUser(1000001, true, false, []string{"ace"})}}
+
+	ops := PlanACE(roster, []int{1000001}, []string{"ace"})
+
+	if len(ops) != 0 {
+		t.Errorf("expected no ops when user already has ace, got %+v", ops)
+	}
+}
+
+func TestPlanACESkipsWhenRoleNotAvailable(t *testing.T) {
+	roster := zau.Roster{Home: []zau.User{zUser(1000001, true, false, nil)}}
+
+	ops := PlanACE(roster, []int{1000001}, []string{"atm"})
+
+	if len(ops) != 0 {
+		t.Errorf("expected no ops when ace role not available, got %+v", ops)
+	}
+}
+
+func TestPlanACEMergesUppercaseExistingRoles(t *testing.T) {
+	roster := zau.Roster{Home: []zau.User{zUser(1000001, true, false, []string{"ATM"})}}
+
+	ops := PlanACE(roster, []int{1000001}, []string{"atm", "ace"})
+
+	if len(ops) != 1 || ops[0].Kind != OpAddACE {
+		t.Fatalf("expected 1 add-ace op, got %+v", ops)
+	}
+
+	want := []string{"atm", "ace"}
+	if !slices.Equal(ops[0].Roles, want) {
+		t.Errorf("expected roles %v, got %v", want, ops[0].Roles)
+	}
+}
+
+func TestPlanACEVisitingUserGetsRole(t *testing.T) {
+	roster := zau.Roster{Visiting: []zau.User{zUser(1000001, false, true, nil)}}
+
+	ops := PlanACE(roster, []int{1000001}, []string{"ace"})
+
+	if len(ops) != 1 || ops[0].Kind != OpAddACE {
+		t.Fatalf("expected 1 add-ace op for visiting user, got %+v", ops)
+	}
+}
+
 func TestPlanDoesNotMutateInputRoster(t *testing.T) {
 	home := []zau.User{zUser(1000001, true, false, []string{"atm"})}
 	roster := zau.Roster{Home: home}

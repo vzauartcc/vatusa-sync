@@ -137,6 +137,10 @@ func logCounts(result rostersync.Result) {
 		attrs = append(attrs, "certsRemoved", result.CertsRemoved)
 	}
 
+	if result.ACEGrants > 0 {
+		attrs = append(attrs, "aceGrants", result.ACEGrants)
+	}
+
 	if len(attrs) == 0 {
 		return
 	}
