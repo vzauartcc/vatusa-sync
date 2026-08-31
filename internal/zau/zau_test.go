@@ -7,8 +7,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/cristalhq/jwt/v5"
 )
 
 const (
@@ -25,22 +28,41 @@ func TestNewClientDefaultsToTimeout(t *testing.T) {
 }
 
 func TestFetchRosterDecodesAndAuthenticates(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-		if req.Method != http.MethodGet {
-			t.Errorf("expected GET, got %s", req.Method)
-		}
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			if req.Method != http.MethodGet {
+				t.Errorf("expected GET, got %s", req.Method)
+			}
 
-		if req.URL.Path != "/user" {
-			t.Errorf("expected path /user, got %s", req.URL.Path)
-		}
+			if req.URL.Path != "/user" {
+				t.Errorf("expected path /user, got %s", req.URL.Path)
+			}
 
-		if got := req.Header.Get("Authorization"); got != "Bearer test-key" {
-			t.Errorf("expected Bearer test-key, got %q", got)
-		}
+			auth := req.Header.Get("Authorization")
+			if !strings.HasPrefix(auth, "Bearer ") {
+				t.Fatalf("expected Bearer token, got %q", auth)
+			}
 
-		writer.Header().Set("Content-Type", "application/json")
-		_, _ = writer.Write([]byte(`{"home":[{"cid":1234567,"fname":"John","lname":"Doe","email":"john@example.com","rating":3,"homeFacility":"ZAU","broadcast":true,"member":true,"vis":false,"prefName":false,"certCodes":[],"roleCodes":["atm"]}],"visiting":[],"removed":[]}`))
-	}))
+			tokenStr := strings.TrimPrefix(auth, "Bearer ")
+
+			verifier, err := jwt.NewVerifierHS(jwt.HS256, []byte("test-key"))
+			if err != nil {
+				t.Fatalf("failed to create verifier: %v", err)
+			}
+
+			_, err = jwt.Parse([]byte(tokenStr), verifier)
+			if err != nil {
+				t.Fatalf("invalid or unverifiable JWT: %v", err)
+			}
+
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write(
+				[]byte(
+					`{"home":[{"cid":1234567,"fname":"John","lname":"Doe","email":"john@example.com","rating":3,"homeFacility":"ZAU","broadcast":true,"member":true,"vis":false,"prefName":false,"certCodes":[],"roleCodes":["atm"]}],"visiting":[],"removed":[]}`,
+				),
+			)
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)
@@ -60,9 +82,11 @@ func TestFetchRosterDecodesAndAuthenticates(t *testing.T) {
 }
 
 func TestFetchRosterReturnsErrorOnNon200(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		writer.WriteHeader(http.StatusInternalServerError)
-	}))
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			writer.WriteHeader(http.StatusInternalServerError)
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)
@@ -74,14 +98,20 @@ func TestFetchRosterReturnsErrorOnNon200(t *testing.T) {
 }
 
 func TestFetchRolesReturnsCodes(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-		if req.URL.Path != "/controller/role" {
-			t.Errorf("expected path /controller/role, got %s", req.URL.Path)
-		}
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			if req.URL.Path != "/controller/role" {
+				t.Errorf("expected path /controller/role, got %s", req.URL.Path)
+			}
 
-		writer.Header().Set("Content-Type", "application/json")
-		_, _ = writer.Write([]byte(`[{"name":"ATM","code":"ATM","order":1,"class":"staff"},{"name":"EC","code":"EC","order":2,"class":"staff"}]`))
-	}))
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write(
+				[]byte(
+					`[{"name":"ATM","code":"ATM","order":1,"class":"staff"},{"name":"EC","code":"EC","order":2,"class":"staff"}]`,
+				),
+			)
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)
@@ -99,17 +129,19 @@ func TestFetchRolesReturnsCodes(t *testing.T) {
 func TestSetRolesSendsPutWithRoles(t *testing.T) {
 	var gotMethod, gotPath, gotBody, gotContentType string
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-		rawBody, _ := io.ReadAll(req.Body)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			rawBody, _ := io.ReadAll(req.Body)
 
-		gotMethod = req.Method
-		gotPath = req.URL.Path
-		gotBody = string(rawBody)
-		gotContentType = req.Header.Get("Content-Type")
+			gotMethod = req.Method
+			gotPath = req.URL.Path
+			gotBody = string(rawBody)
+			gotContentType = req.Header.Get("Content-Type")
 
-		writer.WriteHeader(http.StatusOK)
-		_, _ = writer.Write([]byte(`{}`))
-	}))
+			writer.WriteHeader(http.StatusOK)
+			_, _ = writer.Write([]byte(`{}`))
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)
@@ -142,21 +174,28 @@ func TestSetRolesSendsPutWithRoles(t *testing.T) {
 func TestSetHomeControllerSendsPatch(t *testing.T) {
 	var gotMethod, gotPath, gotBody string
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-		body, _ := io.ReadAll(req.Body)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			body, _ := io.ReadAll(req.Body)
 
-		gotMethod = req.Method
-		gotPath = req.URL.Path
-		gotBody = string(body)
+			gotMethod = req.Method
+			gotPath = req.URL.Path
+			gotBody = string(body)
 
-		writer.WriteHeader(http.StatusOK)
-		_, _ = writer.Write([]byte(`{}`))
-	}))
+			writer.WriteHeader(http.StatusOK)
+			_, _ = writer.Write([]byte(`{}`))
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)
 
-	err := client.SetHomeController(context.Background(), 1234567, true, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	err := client.SetHomeController(
+		context.Background(),
+		1234567,
+		true,
+		time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -180,16 +219,18 @@ func TestSetHomeControllerSendsPatch(t *testing.T) {
 func TestSetVisitingControllerSendsPatch(t *testing.T) {
 	var gotMethod, gotPath, gotBody string
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-		body, _ := io.ReadAll(req.Body)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			body, _ := io.ReadAll(req.Body)
 
-		gotMethod = req.Method
-		gotPath = req.URL.Path
-		gotBody = string(body)
+			gotMethod = req.Method
+			gotPath = req.URL.Path
+			gotBody = string(body)
 
-		writer.WriteHeader(http.StatusOK)
-		_, _ = writer.Write([]byte(`{}`))
-	}))
+			writer.WriteHeader(http.StatusOK)
+			_, _ = writer.Write([]byte(`{}`))
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)
@@ -218,16 +259,18 @@ func TestSetVisitingControllerSendsPatch(t *testing.T) {
 func TestSetRatingSendsPatch(t *testing.T) {
 	var gotMethod, gotPath, gotBody string
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-		body, _ := io.ReadAll(req.Body)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			body, _ := io.ReadAll(req.Body)
 
-		gotMethod = req.Method
-		gotPath = req.URL.Path
-		gotBody = string(body)
+			gotMethod = req.Method
+			gotPath = req.URL.Path
+			gotBody = string(body)
 
-		writer.WriteHeader(http.StatusOK)
-		_, _ = writer.Write([]byte(`{}`))
-	}))
+			writer.WriteHeader(http.StatusOK)
+			_, _ = writer.Write([]byte(`{}`))
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)
@@ -256,21 +299,31 @@ func TestSetRatingSendsPatch(t *testing.T) {
 func TestSetCoreDetailsSendsPatch(t *testing.T) {
 	var gotMethod, gotPath, gotBody string
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-		body, _ := io.ReadAll(req.Body)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			body, _ := io.ReadAll(req.Body)
 
-		gotMethod = req.Method
-		gotPath = req.URL.Path
-		gotBody = string(body)
+			gotMethod = req.Method
+			gotPath = req.URL.Path
+			gotBody = string(body)
 
-		writer.WriteHeader(http.StatusOK)
-		_, _ = writer.Write([]byte(`{}`))
-	}))
+			writer.WriteHeader(http.StatusOK)
+			_, _ = writer.Write([]byte(`{}`))
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)
 
-	err := client.SetCoreDetails(context.Background(), 1234567, "Jane", "Smith", "jane@example.com", true, false)
+	err := client.SetCoreDetails(
+		context.Background(),
+		1234567,
+		"Jane",
+		"Smith",
+		"jane@example.com",
+		true,
+		false,
+	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -295,16 +348,18 @@ func TestSetCoreDetailsSendsPatch(t *testing.T) {
 func TestCreateUserSendsPost(t *testing.T) {
 	var gotMethod, gotPath, gotBody string
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-		body, _ := io.ReadAll(req.Body)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			body, _ := io.ReadAll(req.Body)
 
-		gotMethod = req.Method
-		gotPath = req.URL.Path
-		gotBody = string(body)
+			gotMethod = req.Method
+			gotPath = req.URL.Path
+			gotBody = string(body)
 
-		writer.WriteHeader(http.StatusCreated)
-		_, _ = writer.Write([]byte(`{}`))
-	}))
+			writer.WriteHeader(http.StatusCreated)
+			_, _ = writer.Write([]byte(`{}`))
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)
@@ -355,16 +410,18 @@ func TestCreateUserSendsPost(t *testing.T) {
 func TestRemoveCertsSendsPatch(t *testing.T) {
 	var gotMethod, gotPath, gotBody string
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-		body, _ := io.ReadAll(req.Body)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			body, _ := io.ReadAll(req.Body)
 
-		gotMethod = req.Method
-		gotPath = req.URL.Path
-		gotBody = string(body)
+			gotMethod = req.Method
+			gotPath = req.URL.Path
+			gotBody = string(body)
 
-		writer.WriteHeader(http.StatusOK)
-		_, _ = writer.Write([]byte(`{}`))
-	}))
+			writer.WriteHeader(http.StatusOK)
+			_, _ = writer.Write([]byte(`{}`))
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)
@@ -384,10 +441,12 @@ func TestRemoveCertsSendsPatch(t *testing.T) {
 }
 
 func TestSendDataReturnsErrorOnNonSuccessStatus(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		writer.WriteHeader(http.StatusBadRequest)
-		_, _ = writer.Write([]byte(`{"error":"nope"}`))
-	}))
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			writer.WriteHeader(http.StatusBadRequest)
+			_, _ = writer.Write([]byte(`{"error":"nope"}`))
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)
@@ -421,10 +480,12 @@ func TestFetchRolesReturnsErrorWhenMissingBaseURL(t *testing.T) {
 }
 
 func TestFetchRosterReturnsErrorOnInvalidJSON(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
-		_, _ = writer.Write([]byte(`not json`))
-	}))
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`not json`))
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)
@@ -436,10 +497,12 @@ func TestFetchRosterReturnsErrorOnInvalidJSON(t *testing.T) {
 }
 
 func TestFetchRolesReturnsErrorOnInvalidJSON(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
-		_, _ = writer.Write([]byte(`not json`))
-	}))
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`not json`))
+		}),
+	)
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key", nil)

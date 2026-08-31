@@ -7,10 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/cristalhq/jwt/v5"
 )
 
 var (
@@ -36,7 +39,12 @@ func NewClient(baseURL, apiKey string, httpClient *http.Client) *Client {
 	}
 }
 
-func (c *Client) SetHomeController(ctx context.Context, cid int, member bool, joinDate time.Time) error {
+func (c *Client) SetHomeController(
+	ctx context.Context,
+	cid int,
+	member bool,
+	joinDate time.Time,
+) error {
 	return c.sendData(
 		ctx,
 		http.MethodPatch,
@@ -49,7 +57,12 @@ func (c *Client) SetHomeController(ctx context.Context, cid int, member bool, jo
 	)
 }
 
-func (c *Client) SetVisitingController(ctx context.Context, cid int, visiting bool, homeFacility string) error {
+func (c *Client) SetVisitingController(
+	ctx context.Context,
+	cid int,
+	visiting bool,
+	homeFacility string,
+) error {
 	return c.sendData(
 		ctx,
 		http.MethodPatch,
@@ -148,7 +161,13 @@ func (c *Client) CreateUser(
 }
 
 func (c *Client) RemoveCerts(ctx context.Context, cid int) error {
-	return c.sendData(ctx, http.MethodPatch, fmt.Sprintf("/controller/%d/remove-cert", cid), cid, nil)
+	return c.sendData(
+		ctx,
+		http.MethodPatch,
+		fmt.Sprintf("/controller/%d/remove-cert", cid),
+		cid,
+		nil,
+	)
 }
 
 func (c *Client) FetchRoster(ctx context.Context) (Roster, error) {
@@ -239,7 +258,11 @@ func (c *Client) sendData(ctx context.Context, method, path string, cid int, dat
 
 		return err
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		responseBody, _ := io.ReadAll(resp.Body)
@@ -275,15 +298,38 @@ func (c *Client) newZauAuthRequest(
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+c.generateJWT())
 
-	if method != http.MethodGet && method != http.MethodHead &&
-		req.Header.Get("Content-Type") == "" {
-		// Set Content-Type for non-GET requests
-		if body != nil {
-			req.Header.Set("Content-Type", "application/json")
-		}
-	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "roster-sync/1.0")
+	req.Header.Set("Content-Type", "application/json")
 
 	return req, nil
+}
+
+func (c *Client) generateJWT() string {
+	key := []byte(c.apiKey)
+
+	signer, err := jwt.NewSignerHS(jwt.HS256, key)
+	if err != nil {
+		log.Printf("Error generating JWT: %v\n", err)
+
+		return ""
+	}
+
+	claims := &jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Second)),
+		Subject:   "roster-sync",
+	}
+
+	builder := jwt.NewBuilder(signer)
+
+	token, err := builder.Build(claims)
+	if err != nil {
+		log.Printf("Error signing JWT: %v\n", err)
+
+		return ""
+	}
+
+	return token.String()
 }
