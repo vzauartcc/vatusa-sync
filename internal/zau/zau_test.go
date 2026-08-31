@@ -126,7 +126,7 @@ func TestFetchRolesReturnsCodes(t *testing.T) {
 	}
 }
 
-func TestSetRolesSendsPutWithRoles(t *testing.T) {
+func TestSetRolesSendsPatchWithRoles(t *testing.T) {
 	var gotMethod, gotPath, gotBody, gotContentType string
 
 	server := httptest.NewServer(
@@ -151,8 +151,8 @@ func TestSetRolesSendsPutWithRoles(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if gotMethod != http.MethodPut || gotPath != testCIDPath {
-		t.Errorf("expected PUT %s, got %s %s", testCIDPath, gotMethod, gotPath)
+	if gotMethod != http.MethodPatch || gotPath != "/controller/1234567/roles" {
+		t.Errorf("expected PATCH /controller/1234567/roles, got %s %s", gotMethod, gotPath)
 	}
 
 	if gotContentType != "application/json" {

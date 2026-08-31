@@ -45,6 +45,8 @@ func (c *Client) SetHomeController(
 	member bool,
 	joinDate time.Time,
 ) error {
+	slog.Info("setting home status", "cid", cid, "rostered", member)
+
 	return c.sendData(
 		ctx,
 		http.MethodPatch,
@@ -63,6 +65,8 @@ func (c *Client) SetVisitingController(
 	visiting bool,
 	homeFacility string,
 ) error {
+	slog.Info("setting visiting status", "cid", cid, "visiting", visiting)
+
 	return c.sendData(
 		ctx,
 		http.MethodPatch,
@@ -76,6 +80,8 @@ func (c *Client) SetVisitingController(
 }
 
 func (c *Client) SetRating(ctx context.Context, cid int, rating int) error {
+	slog.Info("setting rating", "cid", cid, "rating", rating)
+
 	return c.sendData(
 		ctx,
 		http.MethodPatch,
@@ -96,6 +102,22 @@ func (c *Client) SetCoreDetails(
 	allowEmails bool,
 	namePrivacy bool,
 ) error {
+	slog.Info(
+		"setting core details",
+		"cid",
+		cid,
+		"fname",
+		fname,
+		"lname",
+		lname,
+		"email",
+		email,
+		"broadcast_opted_in",
+		allowEmails,
+		"name_privacy",
+		namePrivacy,
+	)
+
 	return c.sendData(
 		ctx,
 		http.MethodPatch,
@@ -112,10 +134,12 @@ func (c *Client) SetCoreDetails(
 }
 
 func (c *Client) SetRoles(ctx context.Context, cid int, roles []string) error {
+	slog.Info("setting roles", "cid", cid, "roles", roles)
+
 	return c.sendData(
 		ctx,
-		http.MethodPut,
-		fmt.Sprintf("/controller/%d", cid),
+		http.MethodPatch,
+		fmt.Sprintf("/controller/%d/roles", cid),
 		cid,
 		RolesControllerPayload{
 			Roles: roles,
@@ -138,6 +162,22 @@ func (c *Client) CreateUser(
 	joinDate time.Time,
 	roles []string,
 ) error {
+	slog.Info(
+		"setting home status",
+		"cid",
+		cid,
+		"fname",
+		fname,
+		"lname",
+		lname,
+		"home_controller",
+		member,
+		"visiting",
+		visiting,
+		"rating",
+		rating,
+	)
+
 	return c.sendData(
 		ctx,
 		http.MethodPost,
@@ -161,6 +201,8 @@ func (c *Client) CreateUser(
 }
 
 func (c *Client) RemoveCerts(ctx context.Context, cid int) error {
+	slog.Info("removing certs", "cid", cid)
+
 	return c.sendData(
 		ctx,
 		http.MethodPatch,
@@ -254,7 +296,13 @@ func (c *Client) sendData(ctx context.Context, method, path string, cid int, dat
 
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		slog.Error("request failed", "method", method, "cid", cid, "error", err)
+		slog.Error(
+			"request failed",
+			"method", method,
+			"path", req.URL.Path,
+			"cid", cid,
+			"error", err,
+		)
 
 		return err
 	}
@@ -269,6 +317,7 @@ func (c *Client) sendData(ctx context.Context, method, path string, cid int, dat
 		slog.Error(
 			"request failed with non-success status",
 			"method", method,
+			"path", req.URL.Path,
 			"cid", cid,
 			"status", resp.Status,
 			"response", string(responseBody),

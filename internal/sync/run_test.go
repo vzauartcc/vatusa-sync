@@ -163,16 +163,16 @@ func TestRunUpdatesRolesWithExistingRolesIncluded(t *testing.T) {
 		t.Errorf("expected 1 role update, got %d", result.UpdatedRoles)
 	}
 
-	put := findRequest(requests, http.MethodPut, "/controller/1000001")
-	if put == nil {
-		t.Fatalf("expected PUT /controller/1000001, requests: %+v", *requests)
+	patch := findRequest(requests, http.MethodPatch, "/controller/1000001/roles")
+	if patch == nil {
+		t.Fatalf("expected PATCH /controller/1000001/roles, requests: %+v", *requests)
 	}
 
 	var payload zau.RolesControllerPayload
 
-	err = json.Unmarshal([]byte(put.body), &payload)
+	err = json.Unmarshal([]byte(patch.body), &payload)
 	if err != nil {
-		t.Fatalf("invalid put body %q: %v", put.body, err)
+		t.Fatalf("invalid patch body %q: %v", patch.body, err)
 	}
 
 	if !slices.Equal(payload.Roles, []string{"atm", "ec"}) {

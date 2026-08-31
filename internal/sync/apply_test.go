@@ -44,7 +44,7 @@ func TestApplyHandlesAllOperationKinds(t *testing.T) {
 		{method: http.MethodPatch, path: "/controller/1000002/member"},
 		{method: http.MethodPatch, path: "/controller/1000003/visit"},
 		{method: http.MethodPatch, path: "/controller/1000004/rating"},
-		{method: http.MethodPut, path: "/controller/1000005"},
+		{method: http.MethodPatch, path: "/controller/1000005/roles"},
 		{method: http.MethodPatch, path: "/controller/1000006/member"},
 		{method: http.MethodPatch, path: "/controller/1000007/remove-cert"},
 	}
