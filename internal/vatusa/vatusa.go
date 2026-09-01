@@ -6,51 +6,114 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
-	"os"
-	"strings"
 	"time"
 )
 
 var (
-	vatusaURL        = "https://api.vatusa.net/v2/facility/ZAU/roster/both"
 	ErrMissingEnv    = errors.New("missing environment variables")
 	ErrInvalidStatus = errors.New("invalid status code returned")
 )
 
-func FetchData(ctx context.Context) ([]Controller, error) {
-	apiKey := strings.TrimSpace(os.Getenv("VATUSA_API_KEY"))
-	if apiKey == "" {
-		return []Controller{}, ErrMissingEnv
+type Client struct {
+	url    string
+	apiKey string
+	hc     *http.Client
+}
+
+func NewClient(url, apiKey string, httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 30 * time.Second}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s?apikey=%s&t=%d", vatusaURL, apiKey, time.Now().UnixMilli()), nil)
+	return &Client{
+		url:    url,
+		apiKey: apiKey,
+		hc:     httpClient,
+	}
+}
+
+func (c *Client) FetchRoster(ctx context.Context) ([]Controller, error) {
+	start := time.Now()
+
+	req, err := c.newVatusaRequest(ctx, http.MethodGet, "/facility/ZAU/roster/both")
 	if err != nil {
-		log.Printf("Error creating request for VATUSA data: %v\n", err)
-		return []Controller{}, err
+		return nil, err
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.hc.Do(req)
 	if err != nil {
-		log.Printf("Error fetching VATUSA data: %v\n", err)
-		return []Controller{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return []Controller{}, fmt.Errorf("%w: %s", ErrInvalidStatus, resp.Status)
+		return nil, fmt.Errorf("%w: %s", ErrInvalidStatus, resp.Status)
 	}
 
 	var vatusaData Roster
 
 	err = json.NewDecoder(resp.Body).Decode(&vatusaData)
 	if err != nil {
-		log.Printf("Error unmarshaling VATUSA data: %v\n", err)
-		return []Controller{}, err
+		return nil, err
 	}
 
+	slog.Info("vatusa roster fetch complete", "duration_seconds", time.Since(start).Seconds())
+
 	return vatusaData.Data, nil
+}
+
+func (c *Client) FetchACE(ctx context.Context) ([]int, error) {
+	req, err := c.newVatusaRequest(ctx, http.MethodGet, "/user/roles/ZHQ/ACE")
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: %s", ErrInvalidStatus, resp.Status)
+	}
+
+	var aceData ACERoster
+
+	err = json.NewDecoder(resp.Body).Decode(&aceData)
+	if err != nil {
+		return nil, err
+	}
+
+	cids := make([]int, 0, len(aceData.Data))
+	for _, member := range aceData.Data {
+		cids = append(cids, member.CID)
+	}
+
+	return cids, nil
+}
+
+func (c *Client) newVatusaRequest(ctx context.Context, method, path string) (*http.Request, error) {
+	if c.apiKey == "" || c.url == "" {
+		return nil, ErrMissingEnv
+	}
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		method,
+		fmt.Sprintf("%s%s?apikey=%s&t=%d", c.url, path, c.apiKey, time.Now().UnixMilli()),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "zau-roster-sync/1.0")
+
+	return req, nil
 }
 
 func (ct *CertSyncDate) UnmarshalJSON(byteSlice []byte) error {
